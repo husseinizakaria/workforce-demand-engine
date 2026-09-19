@@ -241,28 +241,15 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <script>
 (function(){
 "use strict";
-/* Deployment configuration.
-   Copy this file, fill in your own values, and serve it alongside the app.
-   Nothing here is secret: the publishable key is a public client key and every
-   table is protected by row-level security (see supabase/schema.sql).        */
+/* Deployment configuration for the Coresight live platform.
+   The publishable key is a public client key: every table is protected by
+   row-level security (see supabase/schema.sql), so on its own it grants
+   nothing. The secret key must never appear here.                          */
 window.WDE_CONFIG = {
-  /* "auto"     — use Claude's artifact database when the page runs inside
-                  claude.ai, Supabase when configured below, otherwise this
-                  browser's local storage.
-     "supabase" — always Supabase. Fails loudly if it cannot connect.
-     "local"    — always this browser's local storage (offline demo).        */
-  backend: "auto",
-
-  /* Your Supabase. For a Saudi-region deployment this is your own server,
-     e.g. https://api.workforce.core-sight.sa                                 */
-  supabaseUrl: "",
-
-  /* SUPABASE_PUBLISHABLE_KEY from your .env. Older projects call this the
-     anon key; either works.                                                  */
-  supabaseKey: "",
-
-  /* Shown in the sidebar so people know which environment they are in.       */
-  environment: "Prototype"
+  backend: "supabase",
+  supabaseUrl: "https://jkceuxynvwvyicczxobh.supabase.co",
+  supabaseKey: "sb_publishable_UWWmMpAFR_WLjZ1EtHTl8Q_mKdzceCA",
+  environment: "Coresight"
 };
 
 
