@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Workforce Demand Engine</title>
+<meta name="description" content="Workforce demand and FTE planning — driver library, department input, gap dashboard and scenario modelling.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="app">
+  <nav class="rail">
+    <div class="brand">
+      <div class="mark">HZ</div>
+      <div><b>Workforce Demand Engine</b><span>Coresight</span></div>
+    </div>
+    <div class="navgroup">
+      <p>Plan</p>
+      <div class="nav" id="nav-plan"></div>
+    </div>
+    <div class="navgroup">
+      <p>Configure</p>
+      <div class="nav" id="nav-config"></div>
+    </div>
+    <div class="railfoot" id="railfoot">Prototype build</div>
+  </nav>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="ctl"><label for="tenant">Client</label>
+        <select id="tenant"></select></div>
+      <div class="ctl"><label for="scenario">Scenario</label>
+        <select id="scenario"></select></div>
+      <div class="grow"></div>
+      <div class="ctl"><label for="role">Signed in as</label>
+        <select id="role">
+          <option value="admin">Consultant (admin)</option>
+          <option value="hod">Department head</option>
+          <option value="exec">Client executive</option>
+        </select></div>
+      <div class="ctl" id="hodpick-wrap" hidden><label for="hoddept">Department</label>
+        <select id="hoddept"></select></div>
+      <button class="btn sm ghost" id="signout" hidden>Sign out</button>
+      <span class="chip" id="storechip">Connecting…</span>
+    </div>
+    <div class="scroller"><div class="wrap" id="view"></div></div>
+  </div>
+</div>
+
+<script src="src/config.js"></script>
+<script src="src/engine.js"></script>
+<script src="src/storage.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>
