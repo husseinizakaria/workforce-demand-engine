@@ -1179,14 +1179,14 @@ function vLibrary(root){
 }
 
 /* ============ import / export ============ */
-const IMPORT_COLS = ["Department code","Department","Sub-department code","Sub-department","Capability","Demand driver","Unit counted","Service hours","Frequency","Duration","Complexity","Ownership %"];
+const IMPORT_COLS = ["Department code","Department","Sub-department code","Sub-department","Capability","Demand driver","Unit counted","Service hours","Frequency","Duration","Complexity","Ownership %","Count","Approved","Filled"];
 function importPanel(){
   const p = el("div","panel");
   p.appendChild(el("header",null,'<h2>Import from your workbook</h2><span class="sub">One row per driver. Paste from Excel (tab-separated) or CSV.</span>'));
   const b = el("div","body");
-  b.appendChild(el("div","note","<b>Columns, in order:</b> "+IMPORT_COLS.join(" · ")+". A header row is detected and skipped. Importing replaces the whole library for this client."));
+  b.appendChild(el("div","note","<b>Columns, in order:</b> "+IMPORT_COLS.join(" · ")+".<br>The last three are optional: <b>Count</b> is per driver and lands in the selected scenario; <b>Approved</b> and <b>Filled</b> are per department — put them on the first row of each department, or every row. A header row is detected and skipped. Importing replaces the whole library for this client."));
   const ta = el("textarea"); ta.rows=7; ta.id="importbox";
-  ta.placeholder = IMPORT_COLS.join(",")+"\n01,Strategy & Governance,01.1,Portfolio Management,Govern,Portfolio intake,Requests triaged,6,Weekly,1,3,100";
+  ta.placeholder = IMPORT_COLS.join(",")+"\n01,Strategy & Governance,01.1,Portfolio Management,Govern,Portfolio intake,Requests triaged,6,Weekly,1,3,100,70,26,21";
   b.appendChild(ta);
   const row = el("div","row"); row.style.marginTop="10px";
   const file = el("input"); file.type="file"; file.accept=".csv,.txt,.tsv"; file.style.fontSize="12.5px";
@@ -1219,19 +1219,29 @@ async function doImport(text){
   const rows = parseDelimited(text);
   if(rows.length<2){ toast("Nothing to import — paste at least one data row"); return; }
   if(/department/i.test(rows[0][0]||"") || /code/i.test(rows[0][0]||"")) rows.shift();
-  const units = {}; let order=0, bad=0;
+  const units = {}; const counts = {}; let order=0, bad=0, withCounts=0;
   rows.forEach(r=>{
     if(r.length<6 || !r[1]){ bad++; return; }
     const ucode = r[0]||"", uname = r[1];
     const key = ucode+"|"+uname;
-    if(!units[key]) units[key] = {id:uid("u"), tenantId:S.tenantId, code:ucode, name:uname, order:order++, approved:0, filled:0, subunits:[], drivers:[]};
+    if(!units[key]){
+      units[key] = {id:uid("u"), tenantId:S.tenantId, code:ucode, name:uname, order:order++, approved:0, filled:0, subunits:[], drivers:[]};
+      counts[key] = {};
+    }
     const u = units[key];
+    if(r[13]!=null && String(r[13]).trim()!=="" && !u.approved) u.approved = Number(r[13])||0;
+    if(r[14]!=null && String(r[14]).trim()!=="" && !u.filled)   u.filled   = Number(r[14])||0;
     const scode = r[2]||"", sname = r[3]||"General";
     let sub = u.subunits.find(s=>s.code===scode && s.name===sname);
     if(!sub){ sub = {id:uid("s"), code:scode, name:sname, order:u.subunits.length}; u.subunits.push(sub); }
     const freq = FREQ_KEYS.find(f=>f.toLowerCase()===String(r[8]||"").toLowerCase()) || "Monthly";
-    u.drivers.push({id:uid("d"), subId:sub.id, capability:r[4]||"", driver:r[5]||"", metric:r[6]||"",
-      rate:Number(r[7])||0, freq:freq, len:Number(r[9])||1, cx:clamp(Math.round(Number(r[10])||3),1,5), own:clamp(Number(r[11])||100,0,100)});
+    const d = {id:uid("d"), subId:sub.id, capability:r[4]||"", driver:r[5]||"", metric:r[6]||"",
+      rate:Number(r[7])||0, freq:freq, len:Number(r[9])||1, cx:clamp(Math.round(Number(r[10])||3),1,5), own:clamp(Number(r[11])||100,0,100)};
+    u.drivers.push(d);
+    if(r[12]!=null && String(r[12]).trim()!==""){
+      const c = Number(r[12]);
+      if(isFinite(c) && c>0){ counts[key][d.id] = c; withCounts++; }
+    }
   });
   const list = Object.values(units);
   if(!list.length){ toast("No valid rows found"); return; }
@@ -1239,7 +1249,16 @@ async function doImport(text){
   for(const old of S.units) await purge("unit", old.id);
   S.units = list; S.data = {}; S.libUnit = list[0].id; S.libImport = false;
   for(const u of list) await persist("unit", u);
-  toast("Imported "+list.length+" departments"+(bad?" ("+bad+" rows skipped)":""));
+  for(const key of Object.keys(units)){
+    const u = units[key], c = counts[key];
+    if(c && Object.keys(c).length){
+      const body = {counts:c, status:"submitted", updatedAt:Date.now()};
+      S.data[u.id] = body;
+      await persist("counts", {id:u.id, body:body});
+    }
+  }
+  toast("Imported "+list.length+" departments, "+list.reduce((a,u)=>a+u.drivers.length,0)+" drivers"+
+        (withCounts?", "+withCounts+" counts":"")+(bad?" ("+bad+" rows skipped)":""));
   render();
 }
 function toCSV(rows){
@@ -1263,10 +1282,14 @@ async function offerFile(filename, text){
 }
 function exportLibrary(){
   const rows = [IMPORT_COLS];
-  S.units.forEach(u=>(u.drivers||[]).forEach(d=>{
-    const s = (u.subunits||[]).find(x=>x.id===d.subId)||{};
-    rows.push([u.code,u.name,s.code||"",s.name||"",d.capability,d.driver,d.metric,d.rate,d.freq,d.len,d.cx,d.own]);
-  }));
+  S.units.forEach(u=>{
+    const cts = unitData(u.id).counts;
+    (u.drivers||[]).forEach((d,i)=>{
+      const s = (u.subunits||[]).find(x=>x.id===d.subId)||{};
+      rows.push([u.code,u.name,s.code||"",s.name||"",d.capability,d.driver,d.metric,d.rate,d.freq,d.len,d.cx,d.own,
+                 cts[d.id]!=null?cts[d.id]:"", i===0?(u.approved||0):"", i===0?(u.filled||0):""]);
+    });
+  });
   offerFile((tenant()?tenant().code||"client":"client")+"_driver_library.csv", toCSV(rows));
 }
 function exportResults(){
@@ -1392,6 +1415,7 @@ async function createClient(){
   const base = {id:uid(), name:"Baseline", kind:"baseline", levers:{}, createdAt:Date.now()};
   S.tenants.push(t); S.tenantId=t.id; S.units=[]; S.scenarios=[base]; S.scenarioId=base.id; S.data={};
   await persist("tenant",t); await persist("scen",base);
+  await applyMembership(t.id);
   S.view="library"; S.libImport=true; render();
 }
 async function seedSample(){
