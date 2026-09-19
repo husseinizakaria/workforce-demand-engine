@@ -1,0 +1,1502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Workforce Demand Engine</title>
+<meta name="description" content="Workforce demand and FTE planning — driver library, department input, gap dashboard and scenario modelling.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* base reset (the Artifact host supplies this; a standalone deployment needs it) */
+:root{color-scheme:light dark;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+img{max-width:100%}
+
+:root{
+  --ground:#EDEFF3; --surface:#FFFFFF; --surface2:#F5F7FA; --surface3:#E7EBF1;
+  --line:#D6DCE5; --line-soft:#E6EAF0;
+  --ink:#16202C; --ink2:#4B5866; --ink3:#727F8D;
+  --band:#17324E; --band-ink:#EEF3F8; --band-line:#2A4A69; --band-dim:#9BB2C8;
+  --accent:#A8622A; --accent-ink:#FFFFFF; --accent-wash:#F4E7DB;
+  --good:#2E6B4F; --good-wash:#E2EFE8;
+  --warn:#8E6412; --warn-wash:#F5EBD8;
+  --bad:#963A32; --bad-wash:#F7E4E1;
+  --shadow:0 1px 2px rgba(22,32,44,.06), 0 8px 24px -16px rgba(22,32,44,.24);
+  --r:4px;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --ground:#0E141B; --surface:#161E28; --surface2:#1B242F; --surface3:#222D3A;
+  --line:#2A3542; --line-soft:#222C38;
+  --ink:#E7ECF2; --ink2:#A9B6C4; --ink3:#7E8C9B;
+  --band:#182534; --band-ink:#E7ECF2; --band-line:#2C3B4C; --band-dim:#8496A8;
+  --accent:#D48B4F; --accent-ink:#1A1206; --accent-wash:#2E2318;
+  --good:#6FBF95; --good-wash:#1B2C24;
+  --warn:#D9AE5B; --warn-wash:#2C2618;
+  --bad:#E08078; --bad-wash:#30201E;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+}}
+:root[data-theme="dark"]{
+  --ground:#0E141B; --surface:#161E28; --surface2:#1B242F; --surface3:#222D3A;
+  --line:#2A3542; --line-soft:#222C38;
+  --ink:#E7ECF2; --ink2:#A9B6C4; --ink3:#7E8C9B;
+  --band:#182534; --band-ink:#E7ECF2; --band-line:#2C3B4C; --band-dim:#8496A8;
+  --accent:#D48B4F; --accent-ink:#1A1206; --accent-wash:#2E2318;
+  --good:#6FBF95; --good-wash:#1B2C24;
+  --warn:#D9AE5B; --warn-wash:#2C2618;
+  --bad:#E08078; --bad-wash:#30201E;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{font-family:"IBM Plex Serif","Iowan Old Style",Georgia,serif;font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
+.num{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- shell ---------- */
+.app{display:flex;height:100%;align-items:stretch}
+.rail{
+  width:216px;flex:none;background:var(--band);color:var(--band-ink);
+  display:flex;flex-direction:column;overflow-y:auto;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+.brand{padding:18px 16px 14px;border-bottom:1px solid var(--band-line);display:flex;gap:10px;align-items:flex-start}
+.mark{width:26px;height:26px;flex:none;border:1.5px solid var(--accent);border-radius:2px;display:grid;place-items:center;
+  font-family:"IBM Plex Serif",Georgia,serif;font-size:12px;font-weight:600;color:var(--accent)}
+.brand b{display:block;font-family:"IBM Plex Serif",Georgia,serif;font-size:14.5px;font-weight:600;line-height:1.2}
+.brand span{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--band-dim);margin-top:3px}
+.navgroup{padding:14px 10px 4px}
+.navgroup>p{margin:0 6px 6px;font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--band-dim)}
+.nav{display:flex;flex-direction:column;gap:1px}
+.nav button{
+  display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:0;
+  color:var(--band-ink);padding:7px 10px;border-radius:var(--r);cursor:pointer;font-size:13.5px;
+}
+.nav button:hover{background:rgba(255,255,255,.07)}
+.nav button[aria-current="true"]{background:rgba(255,255,255,.12);box-shadow:inset 2px 0 0 var(--accent)}
+.nav button .ico{width:14px;flex:none;color:var(--band-dim)}
+.nav button[aria-current="true"] .ico{color:var(--accent)}
+.railfoot{margin-top:auto;padding:12px 16px 16px;border-top:1px solid var(--band-line);font-size:11.5px;color:var(--band-dim)}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.topbar{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  padding:10px 20px;padding-top:calc(10px + env(safe-area-inset-top,0px));
+  background:var(--surface);border-bottom:1px solid var(--line);flex:none;
+}
+.topbar .grow{flex:1;min-width:8px}
+.scroller{flex:1;overflow-y:auto;padding:20px;padding-bottom:calc(40px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+
+/* ---------- controls ---------- */
+.ctl{display:flex;align-items:center;gap:6px}
+.ctl>label{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3)}
+select,input[type=text],input[type=number],textarea{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:5px 8px;font-size:13.5px;
+}
+select:hover,input:hover{border-color:var(--ink3)}
+textarea{width:100%;resize:vertical;font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.55}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:5px 11px;cursor:pointer;font-size:13.5px;white-space:nowrap}
+.btn:hover{background:var(--surface2);border-color:var(--ink3)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:500}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent;background:none;color:var(--ink2)}
+.btn.ghost:hover{background:var(--surface2);color:var(--ink)}
+.btn.danger{color:var(--bad);border-color:var(--line)}
+.btn.danger:hover{background:var(--bad-wash);border-color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{padding:3px 8px;font-size:12.5px}
+
+/* ---------- panels ---------- */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.panel>header{padding:13px 16px;border-bottom:1px solid var(--line-soft);display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.panel>header h2{font-size:16px}
+.panel>header .sub{font-size:12.5px;color:var(--ink3);flex:1;min-width:120px}
+.panel .body{padding:16px}
+.pagehead{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+.pagehead h1{font-size:23px}
+.pagehead p{margin:3px 0 0;color:var(--ink2);font-size:13.5px;max-width:62ch}
+
+.eyebrow{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:2px 7px;border-radius:2px;border:1px solid var(--line);color:var(--ink2);background:var(--surface2);white-space:nowrap}
+.chip.good{color:var(--good);background:var(--good-wash);border-color:transparent}
+.chip.warn{color:var(--warn);background:var(--warn-wash);border-color:transparent}
+.chip.bad{color:var(--bad);background:var(--bad-wash);border-color:transparent}
+.chip.accent{color:var(--accent);background:var(--accent-wash);border-color:transparent}
+
+/* ---------- stat strip ---------- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.stat{background:var(--surface);padding:13px 15px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.stat .k{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+.stat .v{font-size:26px;font-weight:500;margin-top:3px;letter-spacing:-.02em}
+.stat .n{font-size:12px;color:var(--ink3);margin-top:1px}
+.stat.lead .v{color:var(--accent)}
+
+/* ---------- tables ---------- */
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{
+  text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);
+  padding:8px 10px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:2;white-space:nowrap
+}
+td{padding:7px 10px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+tbody tr:hover td{background:var(--surface2)}
+td.r,th.r{text-align:right}
+tr.grp td{background:var(--surface3);font-weight:600;font-size:12px;letter-spacing:.02em}
+tr.grp:hover td{background:var(--surface3)}
+tfoot td{border-top:2px solid var(--line);border-bottom:0;font-weight:600;background:var(--surface)}
+.cellinput{width:84px;text-align:right;padding:4px 7px;border:1px solid var(--line);border-radius:2px;background:var(--surface2)}
+.cellinput:focus{background:var(--surface);border-color:var(--accent)}
+.muted{color:var(--ink3)}
+.tiny{font-size:11.5px;color:var(--ink3)}
+
+/* ---------- gap bars ---------- */
+.bar{position:relative;height:16px;background:var(--surface3);border-radius:2px;min-width:110px;overflow:hidden}
+.bar .fill{position:absolute;inset:0 auto 0 0;background:var(--band);opacity:.72}
+.bar .req{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--accent)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink3);align-items:center}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:1px;vertical-align:-1px;margin-right:5px}
+
+/* ---------- misc ---------- */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.kv{display:grid;grid-template-columns:1fr auto;gap:5px 14px;font-size:13px}
+.kv dt{color:var(--ink2)}
+.kv dd{margin:0;text-align:right}
+.note{border-left:2px solid var(--accent);background:var(--accent-wash);padding:10px 13px;border-radius:0 var(--r) var(--r) 0;font-size:12.5px;color:var(--ink2)}
+.formula{background:var(--surface2);border:1px solid var(--line-soft);border-radius:var(--r);padding:11px 13px;font-family:"IBM Plex Mono",monospace;font-size:12.5px;line-height:1.7;overflow-x:auto;white-space:nowrap}
+.formula b{color:var(--accent);font-weight:500}
+.empty{text-align:center;padding:34px 18px;color:var(--ink3)}
+.empty h3{font-size:16px;color:var(--ink);margin-bottom:6px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lever{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line-soft)}
+.lever:last-child{border-bottom:0}
+.lever .lbl{font-size:13px}
+.lever .hint{grid-column:1/-1;font-size:11.5px;color:var(--ink3);margin-top:-2px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));
+  background:var(--band);color:var(--band-ink);padding:9px 16px;border-radius:var(--r);box-shadow:var(--shadow);z-index:60;font-size:13px}
+.mobonly{display:none}
+@media (max-width:820px){
+  .app{flex-direction:column;height:auto;min-height:100%}
+  .rail{width:100%;flex-direction:row;align-items:center;gap:10px;overflow-x:auto;padding:0 12px;position:sticky;top:0;z-index:20}
+  .brand{border-bottom:0;padding:10px 0;flex:none}
+  .brand span{display:none}
+  .navgroup{padding:0;display:flex;align-items:center;gap:6px}
+  .navgroup>p{display:none}
+  .nav{flex-direction:row;gap:2px}
+  .nav button{white-space:nowrap;padding:7px 9px}
+  .nav button[aria-current="true"]{box-shadow:inset 0 -2px 0 var(--accent)}
+  .railfoot{display:none}
+  .scroller{padding:16px}
+  .main{overflow:visible}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail">
+    <div class="brand">
+      <div class="mark">HZ</div>
+      <div><b>Workforce Demand Engine</b><span>Coresight</span></div>
+    </div>
+    <div class="navgroup">
+      <p>Plan</p>
+      <div class="nav" id="nav-plan"></div>
+    </div>
+    <div class="navgroup">
+      <p>Configure</p>
+      <div class="nav" id="nav-config"></div>
+    </div>
+    <div class="railfoot" id="railfoot">Prototype build</div>
+  </nav>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="ctl"><label for="tenant">Client</label>
+        <select id="tenant"></select></div>
+      <div class="ctl"><label for="scenario">Scenario</label>
+        <select id="scenario"></select></div>
+      <div class="grow"></div>
+      <div class="ctl"><label for="role">Signed in as</label>
+        <select id="role">
+          <option value="admin">Consultant (admin)</option>
+          <option value="hod">Department head</option>
+          <option value="exec">Client executive</option>
+        </select></div>
+      <div class="ctl" id="hodpick-wrap" hidden><label for="hoddept">Department</label>
+        <select id="hoddept"></select></div>
+      <button class="btn sm ghost" id="signout" hidden>Sign out</button>
+      <span class="chip" id="storechip">Connecting…</span>
+    </div>
+    <div class="scroller"><div class="wrap" id="view"></div></div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* Deployment configuration for the Coresight live platform.
+   The publishable key is a public client key: every table is protected by
+   row-level security (see supabase/schema.sql), so on its own it grants
+   nothing. The secret key must never appear here.                          */
+window.WDE_CONFIG = {
+  backend: "supabase",
+  supabaseUrl: "https://jkceuxynvwvyicczxobh.supabase.co",
+  supabaseKey: "sb_publishable_UWWmMpAFR_WLjZ1EtHTl8Q_mKdzceCA",
+  environment: "Coresight"
+};
+
+
+/* Engine constants, sample structure, helpers and the FTE calculation. */
+
+/* ============ engine defaults ============ */
+const DEF_ENGINE = {
+  hoursPerDay: 7, workingDays: 228, annualHours: 1596,
+  daysBasis: "365 calendar − 104 weekend − 11 public holidays − 21 annual leave",
+  cx: {1:0.70, 2:0.85, 3:1.00, 4:1.15, 5:1.30},
+  cxLabels: {1:"Very low", 2:"Low", 3:"Moderate", 4:"High", 5:"Very high"},
+  freq: {"Daily":250,"Weekly":52,"Fortnightly":26,"Monthly":12,"Quarterly":4,"Semi-annual":2,"Annual":1,"One-off":1}
+};
+const FREQ_KEYS = Object.keys(DEF_ENGINE.freq);
+
+/* ============ helpers ============ */
+const $ = s => document.querySelector(s);
+const el = (t,c,h) => { const n=document.createElement(t); if(c) n.className=c; if(h!=null) n.innerHTML=h; return n; };
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const uid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+  : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+      const r = Math.random()*16|0, v = c==="x" ? r : (r&0x3|0x8); return v.toString(16); });
+const n1 = v => (Math.round(v*10)/10).toFixed(1);
+const n0 = v => Math.round(v).toLocaleString("en-US");
+const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+let toastTimer;
+function toast(msg){
+  document.querySelectorAll(".toast").forEach(t=>t.remove());
+  const t = el("div","toast", esc(msg)); document.body.appendChild(t);
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.remove(), 2600);
+}
+
+/* ============ sample structure (clearly labelled, not client data) ============ */
+const SAMPLE_UNITS = [
+["01","Strategy & Governance",26,21,[
+  ["01.1","Portfolio & Demand Management",[
+    ["Govern","Portfolio intake and prioritisation","Intake requests triaged",6,"Weekly",1,3,100],
+    ["Govern","Stage-gate reviews","Gate reviews chaired",8,"Monthly",1,4,100],
+    ["Plan","Annual technology plan refresh","Planning cycles run",120,"Annual",1,4,100]]],
+  ["01.2","Architecture & Standards",[
+    ["Govern","Architecture review board","Design packs reviewed",5,"Weekly",1,4,100],
+    ["Plan","Standards and reference models","Standards maintained",14,"Quarterly",1,3,100]]],
+  ["01.3","Vendor & Contract Management",[
+    ["Operate","Vendor performance reviews","Contracts reviewed",4,"Quarterly",1,3,100],
+    ["Operate","Renewal and sourcing support","Renewals processed",10,"Monthly",1,3,80]]]]],
+["02","Enterprise Applications",64,52,[
+  ["02.1","ERP Platform",[
+    ["Operate","Functional support","Tickets resolved",1.4,"Weekly",1,3,100],
+    ["Deliver","Release and regression testing","Releases deployed",46,"Quarterly",1,4,100],
+    ["Operate","Master data governance","Data objects maintained",0.6,"Weekly",1,2,100]]],
+  ["02.2","HR & Corporate Systems",[
+    ["Operate","Application administration","Systems administered",3,"Weekly",1,3,100],
+    ["Deliver","Configuration changes","Change requests delivered",9,"Monthly",1,3,100]]],
+  ["02.3","Integration Services",[
+    ["Deliver","Interface build and certification","Interfaces delivered",34,"Quarterly",1,4,100],
+    ["Operate","Integration monitoring","Interfaces monitored",0.5,"Weekly",1,3,100]]]]],
+["03","Infrastructure & Cloud",58,44,[
+  ["03.1","Cloud Operations",[
+    ["Operate","Workload operations and patching","Workloads operated",1.1,"Weekly",1,3,100],
+    ["Operate","Capacity and cost optimisation","Optimisation cycles",22,"Monthly",1,4,100]]],
+  ["03.2","Network & Connectivity",[
+    ["Operate","Network operations","Sites supported",2.2,"Weekly",1,3,100],
+    ["Deliver","Site enablement","Sites commissioned",70,"Quarterly",1,4,70]]],
+  ["03.3","End-User Computing",[
+    ["Operate","Device lifecycle","Devices managed",0.22,"Monthly",1,2,100],
+    ["Operate","Field support","Incidents handled",0.8,"Weekly",1,2,100]]]]],
+["04","Cybersecurity",34,25,[
+  ["04.1","Security Operations Centre",[
+    ["Operate","Alert triage and response","Alerts triaged",0.35,"Daily",1,4,100],
+    ["Operate","Threat hunting","Hunt cycles run",16,"Monthly",1,5,100]]],
+  ["04.2","Governance, Risk & Compliance",[
+    ["Govern","Control assurance testing","Controls tested",3.5,"Quarterly",1,4,100],
+    ["Govern","Regulatory reporting","Reports issued",18,"Quarterly",1,3,100]]],
+  ["04.3","Identity & Access",[
+    ["Operate","Access request fulfilment","Requests fulfilled",0.4,"Weekly",1,2,100],
+    ["Govern","Access recertification","Campaigns run",60,"Semi-annual",1,4,100]]]]],
+["05","Data & Analytics",30,19,[
+  ["05.1","Data Platform Engineering",[
+    ["Deliver","Pipeline build","Pipelines delivered",52,"Quarterly",1,4,100],
+    ["Operate","Pipeline operations","Pipelines operated",0.45,"Weekly",1,3,100]]],
+  ["05.2","Business Intelligence",[
+    ["Deliver","Dashboard delivery","Dashboards delivered",30,"Quarterly",1,3,100],
+    ["Operate","Report support and refresh","Reports maintained",0.35,"Monthly",1,2,100]]],
+  ["05.3","Data Governance",[
+    ["Govern","Data quality remediation","Quality cycles",26,"Monthly",1,4,100]]]]],
+["06","Service Management",22,18,[
+  ["06.1","Service Desk",[
+    ["Operate","Tier-1 contact handling","Contacts handled",0.28,"Daily",1,2,100]]],
+  ["06.2","Incident & Problem",[
+    ["Operate","Major incident management","Major incidents managed",12,"Monthly",1,5,100],
+    ["Operate","Problem investigation","Problems investigated",9,"Monthly",1,4,100]]],
+  ["06.3","Change & Release",[
+    ["Govern","Change advisory board","CAB sessions run",5,"Weekly",1,3,100]]]]]];
+
+const SAMPLE_COUNTS = {
+ "01":[70,30,1,40,9,14,6], "02":[640,40,900,18,25,12,260], "03":[700,10,45,6,4500,120],
+ "04":[300,20,180,12,320,12], "05":[30,700,40,600,25], "06":[380,8,25,18]
+};
+
+/* ============ engine ============ */
+function driverFTE(d, count, eng, lv){
+  const c = (Number(count)||0) * (1 + (lv.demand||0)/100);
+  const rate = Number(d.rate||0) * (1 - (lv.efficiency||0)/100);
+  const own = clamp(Number(d.own||100) + (lv.ownership||0), 0, 100);
+  const cxi = clamp(Math.round(Number(d.cx||3) + (lv.cx||0)), 1, 5);
+  const hours = c * (eng.freq[d.freq]||1) * (Number(d.len)||1) * rate * (eng.cx[cxi]||1) * (own/100);
+  return hours / (lv.hours || eng.annualHours || 1596);
+}
+function unitFTE(u, eng, lv){
+  const cts = unitData(u.id).counts;
+  return (u.drivers||[]).reduce((s,d)=> s + driverFTE(d, cts[d.id], eng, lv), 0);
+}
+function totals(eng, lv){
+  let req=0, approved=0, filled=0;
+  S.units.forEach(u=>{ req += unitFTE(u, eng, lv); approved += Number(u.approved||0); filled += Number(u.filled||0); });
+  return {req, approved, filled, gap: req - filled};
+}
+function completion(){
+  let done=0;
+  S.units.forEach(u=>{ const c=unitData(u.id).counts; if((u.drivers||[]).some(d=>Number(c[d.id])>0)) done++; });
+  return {done, total:S.units.length};
+}
+
+/* ---- sample structure builder ---- */
+function buildSample(){
+  const tid = uid();
+  const t = {id:tid, name:"Sample Client — Technology Division", code:"SAMPLE", sample:true, engine:{}, createdAt:Date.now()};
+  const units = SAMPLE_UNITS.map(([code,name,approved,filled,subs],ui)=>{
+    const u = {id:uid(), tenantId:tid, code, name, order:ui, approved, filled, subunits:[], drivers:[]};
+    let di=0;
+    subs.forEach((sub,si)=>{
+      const sid = uid();
+      u.subunits.push({id:sid, code:sub[0], name:sub[1], order:si});
+      sub[2].forEach(d=>{
+        u.drivers.push({id:u.id+"-d"+(di++), subId:sid, capability:d[0], driver:d[1], metric:d[2],
+                        rate:d[3], freq:d[4], len:d[5], cx:d[6], own:d[7]});
+      });
+    });
+    return u;
+  });
+  const base = {id:uid(), name:"Baseline", kind:"baseline", levers:{}, createdAt:Date.now()};
+  const scen = [base, {id:uid(), name:"Growth +20%", kind:"scenario", basedOn:base.id,
+                       levers:{demand:20, efficiency:0, ownership:0, cx:0, hours:0}, createdAt:Date.now()}];
+  const data = {};
+  units.forEach(u=>{
+    const seed = SAMPLE_COUNTS[u.code]||[]; const counts={};
+    u.drivers.forEach((d,i)=>{ counts[d.id] = seed[i]!=null ? seed[i] : 0; });
+    data[u.id] = {counts, status:"submitted", updatedAt:Date.now()};
+  });
+  return {tenant:t, units, scenarios:scen, data};
+}
+function loadSampleIntoState(){
+  const s = buildSample();
+  S.tenants=[s.tenant]; S.units=s.units; S.scenarios=s.scenarios; S.data=s.data;
+  S.tenantId=s.tenant.id; S.scenarioId=s.scenarios[0].id;
+}
+
+
+/* ==========================================================================
+   Storage layer.
+
+   The application never talks to a database directly. It calls Store, and
+   Store delegates to whichever adapter this deployment is running on:
+
+     claude    — Claude's artifact database, when the page is an Artifact
+     supabase  — Postgres + auth + row-level security (self-hosted or managed)
+     local     — this browser's local storage, for offline demos
+
+   All three implement the same eleven methods. To add a backend of your own,
+   implement that interface and register it in Store.init().
+   ========================================================================== */
+
+const Store = {
+  kind: "local",
+  remote: false,
+  session: null,      // { userId, email, role, unitId } when signed in
+  error: null,
+
+  async init(){
+    const cfg = window.WDE_CONFIG || {};
+    const want = cfg.backend || "auto";
+
+    if(want === "supabase" || (want === "auto" && cfg.supabaseUrl && publishableKey(cfg))){
+      try{
+        await supabaseAdapter.connect(cfg);
+        this.impl = supabaseAdapter; this.kind = "supabase"; this.remote = true;
+        this.session = await supabaseAdapter.currentSession();
+        return this;
+      }catch(e){
+        this.error = e && e.message ? e.message : "Could not reach the server";
+        if(want === "supabase"){ this.impl = nullAdapter; this.kind = "supabase"; return this; }
+      }
+    }
+
+    if(want === "auto" || want === "claude"){
+      try{
+        if(window.claude && typeof window.claude.use === "function"){
+          const db = await window.claude.use("db");
+          if(db){ claudeAdapter.db = db; this.impl = claudeAdapter; this.kind = "claude"; this.remote = true; return this; }
+        }
+      }catch(e){}
+    }
+
+    this.impl = localAdapter; this.kind = "local"; this.remote = false;
+    return this;
+  },
+
+  listTenants(){ return this.impl.listTenants(); },
+  loadTenant(t){ return this.impl.loadTenant(t); },
+  loadCounts(t,s){ return this.impl.loadCounts(t,s); },
+  putTenant(t){ return this.impl.putTenant(t); },
+  putUnit(t,u){ return this.impl.putUnit(t,u); },
+  putScenario(t,s){ return this.impl.putScenario(t,s); },
+  putCounts(t,s,u,b){ return this.impl.putCounts(t,s,u,b); },
+  delTenant(t){ return this.impl.delTenant(t); },
+  delUnit(t,u){ return this.impl.delUnit(t,u); },
+  delScenario(t,s){ return this.impl.delScenario(t,s); },
+  copyCounts(t,from,to){ return this.impl.copyCounts(t,from,to); }
+};
+
+const clone = o => JSON.parse(JSON.stringify(o));
+
+/* Supabase renamed the public client key: newer self-hosted releases call it
+   the publishable key, older projects the anon key. Accept either. */
+const publishableKey = cfg => cfg.supabaseKey || cfg.supabaseAnonKey || "";
+
+function loadScript(src){
+  return new Promise((ok, fail)=>{
+    const s = document.createElement("script");
+    s.src = src; s.async = true;
+    s.onload = ()=>ok(); s.onerror = ()=>fail(new Error("Could not load " + src));
+    document.head.appendChild(s);
+  });
+}
+
+/* ---------- adapter: none (server configured but unreachable) ------------ */
+const nullAdapter = {
+  listTenants: async()=>[], loadTenant: async()=>({units:[],scenarios:[]}), loadCounts: async()=>({}),
+  putTenant: async()=>{}, putUnit: async()=>{}, putScenario: async()=>{}, putCounts: async()=>{},
+  delTenant: async()=>{}, delUnit: async()=>{}, delScenario: async()=>{}, copyCounts: async()=>{}
+};
+
+/* ---------- adapter: Claude artifact database ---------------------------- */
+const P = {
+  tenant: t => "tenants/"+t,
+  units:  t => "tenants/"+t+"/units",
+  unit:   (t,u) => "tenants/"+t+"/units/"+u,
+  scens:  t => "tenants/"+t+"/scenarios",
+  scen:   (t,s) => "tenants/"+t+"/scenarios/"+s,
+  cdocs:  (t,s) => "tenants/"+t+"/scenarios/"+s+"/units",
+  cdoc:   (t,s,u) => "tenants/"+t+"/scenarios/"+s+"/units/"+u
+};
+const claudeAdapter = {
+  db: null,
+  async listTenants(){
+    const s = await this.db.collection("tenants").get();
+    return s.docs.map(d=>Object.assign({id:d.id}, d.data()));
+  },
+  async loadTenant(t){
+    const [us,ss] = await Promise.all([ this.db.collection(P.units(t)).get(), this.db.collection(P.scens(t)).get() ]);
+    return { units: us.docs.map(d=>Object.assign({id:d.id}, d.data())),
+             scenarios: ss.docs.map(d=>Object.assign({id:d.id}, d.data())) };
+  },
+  async loadCounts(t,s){
+    const snap = await this.db.collection(P.cdocs(t,s)).get();
+    const out = {}; snap.docs.forEach(d=>{ out[d.id] = Object.assign({counts:{},status:"draft"}, d.data()); });
+    return out;
+  },
+  putTenant(t){ return this.db.doc(P.tenant(t.id)).set(clone(t)); },
+  putUnit(t,u){ return this.db.doc(P.unit(t,u.id)).set(clone(u)); },
+  putScenario(t,s){ return this.db.doc(P.scen(t,s.id)).set(clone(s)); },
+  putCounts(t,s,u,b){ return this.db.doc(P.cdoc(t,s,u)).set(clone(b)); },
+  delTenant(t){ return this.db.doc(P.tenant(t)).delete(); },
+  delUnit(t,u){ return this.db.doc(P.unit(t,u)).delete(); },
+  delScenario(t,s){ return this.db.doc(P.scen(t,s)).delete(); },
+  async copyCounts(t,from,to){
+    const snap = await this.db.collection(P.cdocs(t,from)).get();
+    for(const d of snap.docs) await this.db.doc(P.cdoc(t,to,d.id)).set(d.data());
+  }
+};
+
+/* ---------- adapter: browser local storage ------------------------------- */
+const KEY = "wde.v1";
+const localAdapter = {
+  read(){
+    try{ return JSON.parse(localStorage.getItem(KEY)) || {tenants:{},units:{},scenarios:{},counts:{}}; }
+    catch(e){ return {tenants:{},units:{},scenarios:{},counts:{}}; }
+  },
+  write(d){ try{ localStorage.setItem(KEY, JSON.stringify(d)); }catch(e){} },
+  async listTenants(){ return Object.values(this.read().tenants); },
+  async loadTenant(t){
+    const d = this.read();
+    return { units: Object.values(d.units[t]||{}), scenarios: Object.values(d.scenarios[t]||{}) };
+  },
+  async loadCounts(t,s){ return clone(((this.read().counts[t]||{})[s])||{}); },
+  async putTenant(t){ const d=this.read(); d.tenants[t.id]=clone(t); this.write(d); },
+  async putUnit(t,u){ const d=this.read(); (d.units[t]=d.units[t]||{})[u.id]=clone(u); this.write(d); },
+  async putScenario(t,s){ const d=this.read(); (d.scenarios[t]=d.scenarios[t]||{})[s.id]=clone(s); this.write(d); },
+  async putCounts(t,s,u,b){ const d=this.read(); const a=(d.counts[t]=d.counts[t]||{}); (a[s]=a[s]||{})[u]=clone(b); this.write(d); },
+  async delTenant(t){ const d=this.read(); delete d.tenants[t]; delete d.units[t]; delete d.scenarios[t]; delete d.counts[t]; this.write(d); },
+  async delUnit(t,u){ const d=this.read(); if(d.units[t]) delete d.units[t][u]; this.write(d); },
+  async delScenario(t,s){ const d=this.read(); if(d.scenarios[t]) delete d.scenarios[t][s]; if(d.counts[t]) delete d.counts[t][s]; this.write(d); },
+  async copyCounts(t,from,to){ const d=this.read(); const a=(d.counts[t]=d.counts[t]||{}); a[to]=clone(a[from]||{}); this.write(d); }
+};
+
+/* ---------- adapter: Supabase -------------------------------------------- */
+const supabaseAdapter = {
+  sb: null,
+
+  async connect(cfg){
+    if(!window.supabase) await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js");
+    if(!window.supabase) throw new Error("supabase-js did not load");
+    this.sb = window.supabase.createClient(cfg.supabaseUrl, publishableKey(cfg), {
+      auth: { persistSession: true, autoRefreshToken: true }
+    });
+    const { error } = await this.sb.auth.getSession();
+    if(error) throw error;
+  },
+
+  /* --- auth --- */
+  async currentSession(){
+    const { data } = await this.sb.auth.getSession();
+    if(!data || !data.session) return null;
+    const u = data.session.user;
+    return { userId: u.id, email: u.email, role: null, unitId: null };
+  },
+  async signIn(email, password){
+    const { error } = await this.sb.auth.signInWithPassword({ email, password });
+    if(error) throw error;
+    return this.currentSession();
+  },
+  async signOut(){ await this.sb.auth.signOut(); },
+  async membership(tenantId){
+    const { data, error } = await this.sb.from("memberships").select("role, unit_id").eq("tenant_id", tenantId).maybeSingle();
+    if(error || !data) return null;
+    return { role: data.role, unitId: data.unit_id };
+  },
+
+  /* --- data --- */
+  async listTenants(){
+    const { data, error } = await this.sb.from("tenants").select("*").order("name");
+    if(error) throw error;
+    return (data||[]).map(r=>({ id:r.id, name:r.name, code:r.code, engine:r.engine||{}, createdAt:r.created_at }));
+  },
+  async loadTenant(t){
+    const [u, s] = await Promise.all([
+      this.sb.from("units").select("*").eq("tenant_id", t).order("sort"),
+      this.sb.from("scenarios").select("*").eq("tenant_id", t)
+    ]);
+    if(u.error) throw u.error; if(s.error) throw s.error;
+    return {
+      units: (u.data||[]).map(r=>({ id:r.id, tenantId:r.tenant_id, code:r.code, name:r.name, order:r.sort,
+        approved:Number(r.approved)||0, filled:Number(r.filled)||0, subunits:r.subunits||[], drivers:r.drivers||[] })),
+      scenarios: (s.data||[]).map(r=>({ id:r.id, name:r.name, kind:r.kind, basedOn:r.based_on, levers:r.levers||{} }))
+    };
+  },
+  async loadCounts(t,s){
+    const { data, error } = await this.sb.from("unit_counts").select("*").eq("scenario_id", s);
+    if(error) throw error;
+    const out = {};
+    (data||[]).forEach(r=>{ out[r.unit_id] = { counts:r.counts||{}, status:r.status||"draft", updatedAt: r.updated_at ? Date.parse(r.updated_at) : null }; });
+    return out;
+  },
+  async putTenant(t){
+    const { error } = await this.sb.from("tenants").upsert({ id:t.id, name:t.name, code:t.code||null, engine:t.engine||{} });
+    if(error) throw error;
+  },
+  async putUnit(t,u){
+    const { error } = await this.sb.from("units").upsert({ id:u.id, tenant_id:t, code:u.code||null, name:u.name,
+      sort:u.order||0, approved:u.approved||0, filled:u.filled||0, subunits:u.subunits||[], drivers:u.drivers||[] });
+    if(error) throw error;
+  },
+  async putScenario(t,s){
+    const { error } = await this.sb.from("scenarios").upsert({ id:s.id, tenant_id:t, name:s.name, kind:s.kind||"scenario",
+      based_on:s.basedOn||null, levers:s.levers||{} });
+    if(error) throw error;
+  },
+  async putCounts(t,s,u,b){
+    const { error } = await this.sb.from("unit_counts").upsert({ scenario_id:s, unit_id:u,
+      counts:b.counts||{}, status:b.status||"draft", updated_at:new Date().toISOString() });
+    if(error) throw error;
+  },
+  async delTenant(t){ const {error} = await this.sb.from("tenants").delete().eq("id", t); if(error) throw error; },
+  async delUnit(t,u){ const {error} = await this.sb.from("units").delete().eq("id", u); if(error) throw error; },
+  async delScenario(t,s){ const {error} = await this.sb.from("scenarios").delete().eq("id", s); if(error) throw error; },
+  async copyCounts(t,from,to){
+    const { data, error } = await this.sb.from("unit_counts").select("unit_id, counts, status").eq("scenario_id", from);
+    if(error) throw error;
+    if(!data || !data.length) return;
+    const rows = data.map(r=>({ scenario_id:to, unit_id:r.unit_id, counts:r.counts, status:r.status }));
+    const res = await this.sb.from("unit_counts").upsert(rows);
+    if(res.error) throw res.error;
+  }
+};
+
+
+/* Application state, views and boot sequence. */
+
+/* ============ state ============ */
+const S = {
+  tenants: [], units: [], scenarios: [], data: {},   // data[unitId] = {counts:{driverId:n}, status, updatedAt}
+  tenantId: null, scenarioId: null,
+  role: "admin", hodUnit: null, view: "dashboard",
+  ready: false, locked: false
+};
+let booted = false;
+
+const tenant = () => S.tenants.find(t=>t.id===S.tenantId) || null;
+const scenario = () => S.scenarios.find(s=>s.id===S.scenarioId) || null;
+const engine = () => Object.assign({}, DEF_ENGINE, (tenant()||{}).engine||{});
+const levers = () => Object.assign({demand:0,efficiency:0,ownership:0,cx:0,hours:0}, (scenario()||{}).levers||{});
+const unitData = id => S.data[id] || (S.data[id] = {counts:{}, status:"draft"});
+
+/* ============ persistence (delegates to Store) ============ */
+async function persist(kind, obj){
+  try{
+    if(kind==="tenant") await Store.putTenant(obj);
+    if(kind==="unit")   await Store.putUnit(S.tenantId, obj);
+    if(kind==="scen")   await Store.putScenario(S.tenantId, obj);
+    if(kind==="counts") await Store.putCounts(S.tenantId, S.scenarioId, obj.id, obj.body);
+  }catch(e){ toast("Could not save — " + msg(e)); }
+}
+async function purge(kind, id){
+  try{
+    if(kind==="tenant") await Store.delTenant(id);
+    if(kind==="unit")   await Store.delUnit(S.tenantId, id);
+    if(kind==="scen")   await Store.delScenario(S.tenantId, id);
+  }catch(e){ toast("Could not delete — " + msg(e)); }
+}
+const msg = e => (e && (e.message || e.code)) ? (e.message || e.code) : "please try again";
+
+async function pullTenants(){
+  S.tenants = await Store.listTenants();
+  S.tenants.sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+}
+async function pullTenant(tid){
+  S.tenantId = tid;
+  const t = await Store.loadTenant(tid);
+  S.units = (t.units||[]).sort((a,b)=>(a.order||0)-(b.order||0));
+  S.scenarios = t.scenarios||[];
+  if(!S.scenarios.length){
+    const base = {id:uid(), name:"Baseline", kind:"baseline", levers:{}, createdAt:Date.now()};
+    S.scenarios=[base]; await Store.putScenario(tid, base);
+  }
+  S.scenarios.sort((a,b)=> (a.kind==="baseline"?-1:b.kind==="baseline"?1:0) || String(a.name).localeCompare(String(b.name)));
+  if(!S.scenarios.some(s=>s.id===S.scenarioId)) S.scenarioId = S.scenarios[0].id;
+  await applyMembership(tid);
+  await pullCounts();
+}
+async function pullCounts(){
+  S.data = await Store.loadCounts(S.tenantId, S.scenarioId);
+}
+async function copyCountsFrom(fromSid, toSid){
+  if(!fromSid) return;
+  try{ await Store.copyCounts(S.tenantId, fromSid, toSid); await pullCounts(); }catch(e){}
+}
+/* When the backend knows who this is, the role comes from their membership
+   and the "signed in as" switcher disappears. */
+async function applyMembership(tid){
+  if(Store.kind!=="supabase" || !Store.session) return;
+  const m = await Store.impl.membership(tid);
+  if(!m){ S.role="exec"; S.locked=true; return; }
+  S.locked = true;
+  S.role = m.role==="owner" || m.role==="consultant" ? "admin" : m.role;
+  if(m.role==="hod" && m.unitId) S.hodUnit = m.unitId;
+  Store.session.role = m.role; Store.session.unitId = m.unitId;
+}
+
+/* ============ navigation ============ */
+const VIEWS = {
+  dashboard: {label:"Demand dashboard", icon:"▤", group:"plan", roles:["admin","exec"]},
+  input:     {label:"Department input", icon:"▦", group:"plan", roles:["admin","hod"]},
+  scenarios: {label:"Scenarios",        icon:"◨", group:"plan", roles:["admin","exec"]},
+  library:   {label:"Driver library",   icon:"≣", group:"config", roles:["admin"]},
+  engine:    {label:"Engine settings",  icon:"∑", group:"config", roles:["admin"]},
+  clients:   {label:"Clients",          icon:"◈", group:"config", roles:["admin"]}
+};
+function allowed(v){ return VIEWS[v].roles.indexOf(S.role) >= 0; }
+function buildNav(){
+  ["plan","config"].forEach(g=>{
+    const host = $("#nav-"+g); host.innerHTML="";
+    const keys = Object.keys(VIEWS).filter(k=>VIEWS[k].group===g && allowed(k));
+    host.parentElement.hidden = keys.length===0;
+    keys.forEach(k=>{
+      const b = el("button", null, '<span class="ico">'+VIEWS[k].icon+'</span><span>'+esc(VIEWS[k].label)+'</span>');
+      b.setAttribute("aria-current", S.view===k ? "true" : "false");
+      b.onclick = ()=>{ S.view=k; render(); };
+      host.appendChild(b);
+    });
+  });
+}
+
+/* ============ topbar ============ */
+function buildTopbar(){
+  const ts = $("#tenant");
+  ts.innerHTML = S.tenants.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.name)+'</option>').join("") || '<option>No client</option>';
+  ts.value = S.tenantId || "";
+  ts.disabled = S.tenants.length<2 && S.role!=="admin";
+  ts.onchange = async ()=>{ await pullTenant(ts.value); render(); };
+
+  const ss = $("#scenario");
+  ss.innerHTML = S.scenarios.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>').join("") || '<option>—</option>';
+  ss.value = S.scenarioId || "";
+  ss.onchange = async ()=>{ S.scenarioId = ss.value; await pullCounts(); render(); };
+
+  const rs = $("#role");
+  rs.value = S.role;
+  rs.parentElement.hidden = S.locked;
+  const so = $("#signout");
+  so.hidden = !(Store.kind === "supabase" && Store.session);
+  so.onclick = async ()=>{ await Store.impl.signOut(); location.reload(); };
+  rs.onchange = ()=>{
+    S.role = rs.value;
+    if(S.role==="hod" && !S.hodUnit && S.units.length) S.hodUnit = S.units[0].id;
+    if(!allowed(S.view)) S.view = S.role==="hod" ? "input" : "dashboard";
+    render();
+  };
+  const hw = $("#hodpick-wrap"), hd = $("#hoddept");
+  hw.hidden = S.role!=="hod";
+  hd.innerHTML = S.units.map(u=>'<option value="'+esc(u.id)+'">'+esc(u.code+" "+u.name)+'</option>').join("");
+  if(S.hodUnit) hd.value = S.hodUnit;
+  hd.onchange = ()=>{ S.hodUnit = hd.value; render(); };
+  $("#railfoot").textContent = envLabel() + (S.locked && Store.session && Store.session.role ? " · " + Store.session.role : "");
+}
+
+/* ============ render ============ */
+function render(){
+  if(S.role==="hod" && !S.hodUnit && S.units.length) S.hodUnit = S.units[0].id;
+  if(!allowed(S.view)) S.view = S.role==="hod" ? "input" : "dashboard";
+  buildNav(); buildTopbar();
+  const v = $("#view"); v.innerHTML = "";
+  if(!S.tenantId){ v.appendChild(noClient()); return; }
+  ({dashboard:vDashboard, input:vInput, scenarios:vScenarios,
+    library:vLibrary, engine:vEngine, clients:vClients}[S.view])(v);
+}
+function head(title, sub, actions){
+  const h = el("div","pagehead");
+  const left = el("div"); left.appendChild(el("h1",null,esc(title)));
+  if(sub) left.appendChild(el("p",null,esc(sub)));
+  h.appendChild(left);
+  if(actions){ const a = el("div","row"); a.style.marginLeft="auto"; actions.forEach(x=>a.appendChild(x)); h.appendChild(a); }
+  return h;
+}
+function button(label, cls, fn){ const b=el("button","btn "+(cls||""),esc(label)); b.onclick=fn; return b; }
+
+function noClient(){
+  const p = el("div","panel");
+  p.innerHTML = '<div class="empty"><h3>No client workspace yet</h3>'+
+    '<p>Create a client to hold its org structure, driver library and engine settings — or load the sample structure to see how the model behaves.</p></div>';
+  const row = el("div","row"); row.style.justifyContent="center"; row.style.paddingBottom="26px";
+  row.appendChild(button("Create client","primary", createClient));
+  row.appendChild(button("Load sample structure","", seedSample));
+  p.appendChild(row);
+  return p;
+}
+
+/* ============ view: dashboard ============ */
+function vDashboard(root){
+  const eng = engine(), lv = levers(), t = totals(eng, lv), comp = completion();
+  const isScen = scenario() && scenario().kind!=="baseline";
+  root.appendChild(head("Demand dashboard",
+    "Required FTE calculated from the driver library and the counts each department has entered."+(isScen?"  Scenario levers are applied.":"")));
+
+  if(tenant() && tenant().sample){
+    const nb = el("div","note","<b>Sample structure.</b> Six departments with illustrative drivers and counts, so the model reads as a working system. Replace it by importing your own library on the Driver library page.");
+    root.appendChild(nb);
+  }
+
+  const stats = el("div","stats");
+  const gapCls = t.gap>0 ? "bad" : "good";
+  stats.innerHTML =
+    stat("Required FTE", n1(t.req), "calculated demand", "lead") +
+    stat("Filled", n0(t.filled), "people in seats") +
+    stat("Approved", n0(t.approved), "establishment") +
+    stat("Gap vs filled", (t.gap>0?"+":"")+n1(t.gap), t.gap>0?"under-resourced":"headroom") +
+    stat("Departments returned", comp.done+" / "+comp.total, "counts entered");
+  root.appendChild(stats);
+
+  const p = el("div","panel");
+  p.appendChild(el("header", null, '<h2>Demand by department</h2><span class="sub">Bar shows people filled against calculated requirement; the copper marker is the requirement.</span>'));
+  const body = el("div"); body.style.padding = "0";
+  const maxV = Math.max(1, ...S.units.map(u=>Math.max(unitFTE(u,eng,lv), u.filled||0)));
+  const wrap = el("div","tblwrap");
+  const rows = S.units.map(u=>{
+    const req = unitFTE(u,eng,lv), filled = Number(u.filled||0), gap = req-filled;
+    const d = unitData(u.id);
+    const entered = (u.drivers||[]).some(x=>Number(d.counts[x.id])>0);
+    return '<tr>'+
+      '<td><b>'+esc(u.code)+'</b> '+esc(u.name)+'<div class="tiny">'+(u.subunits||[]).length+' sub-departments · '+(u.drivers||[]).length+' drivers</div></td>'+
+      '<td style="width:34%"><div class="bar"><div class="fill" style="width:'+(filled/maxV*100).toFixed(1)+'%"></div>'+
+        '<div class="req" style="left:'+clamp(req/maxV*100,0,99.6).toFixed(1)+'%"></div></div></td>'+
+      '<td class="r num">'+n1(req)+'</td>'+
+      '<td class="r num muted">'+n0(filled)+'</td>'+
+      '<td class="r num muted">'+n0(u.approved||0)+'</td>'+
+      '<td class="r num" style="color:var(--'+(gap>0.05?"bad":gap<-0.05?"good":"ink3")+')">'+(gap>0?"+":"")+n1(gap)+'</td>'+
+      '<td>'+(entered?'<span class="chip good">Returned</span>':'<span class="chip warn">Awaiting counts</span>')+'</td></tr>';
+  }).join("");
+  wrap.innerHTML = '<table><thead><tr><th>Department</th><th>Filled vs required</th><th class="r">Required</th>'+
+    '<th class="r">Filled</th><th class="r">Approved</th><th class="r">Gap</th><th>Status</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody><tfoot><tr><td>Division total</td><td></td><td class="r num">'+n1(t.req)+
+    '</td><td class="r num">'+n0(t.filled)+'</td><td class="r num">'+n0(t.approved)+'</td><td class="r num">'+(t.gap>0?"+":"")+n1(t.gap)+'</td><td></td></tr></tfoot></table>';
+  body.appendChild(wrap);
+  const lg = el("div","legend"); lg.style.padding="10px 16px";
+  lg.innerHTML = '<span><span class="swatch" style="background:var(--band);opacity:.72"></span>Filled headcount</span>'+
+                 '<span><span class="swatch" style="background:var(--accent)"></span>Required FTE</span>';
+  body.appendChild(lg);
+  p.appendChild(body); root.appendChild(p);
+
+  root.appendChild(subDeptPanel(eng, lv));
+}
+function stat(k,v,n,cls){
+  return '<div class="stat '+(cls||"")+'"><div class="k">'+esc(k)+'</div><div class="v num">'+esc(v)+'</div><div class="n">'+esc(n)+'</div></div>';
+}
+function subDeptPanel(eng, lv){
+  const p = el("div","panel");
+  p.appendChild(el("header",null,'<h2>Demand by sub-department</h2><span class="sub">Where the requirement actually sits.</span>'));
+  const rows=[];
+  S.units.forEach(u=>{
+    const cts = unitData(u.id).counts;
+    (u.subunits||[]).forEach(s=>{
+      const f = (u.drivers||[]).filter(d=>d.subId===s.id).reduce((a,d)=>a+driverFTE(d,cts[d.id],eng,lv),0);
+      rows.push({unit:u, sub:s, fte:f});
+    });
+  });
+  rows.sort((a,b)=>b.fte-a.fte);
+  const top = rows.slice(0,12);
+  const max = Math.max(1, ...top.map(r=>r.fte));
+  const w = el("div","tblwrap");
+  w.innerHTML = '<table><thead><tr><th>Sub-department</th><th>Department</th><th style="width:30%">Share</th><th class="r">Required FTE</th></tr></thead><tbody>'+
+    top.map(r=>'<tr><td><b>'+esc(r.sub.code)+'</b> '+esc(r.sub.name)+'</td><td class="muted">'+esc(r.unit.name)+'</td>'+
+      '<td><div class="bar"><div class="fill" style="width:'+(r.fte/max*100).toFixed(1)+'%;background:var(--accent);opacity:.8"></div></div></td>'+
+      '<td class="r num">'+n1(r.fte)+'</td></tr>').join("")+'</tbody></table>';
+  const b = el("div"); b.appendChild(w);
+  if(rows.length>12) b.appendChild(el("div","tiny","Showing the 12 largest of "+rows.length+" sub-departments.")).style.padding="10px 16px";
+  p.appendChild(b);
+  return p;
+}
+
+/* ============ view: department input ============ */
+let saveTimer = null;
+function vInput(root){
+  const eng = engine(), lv = levers();
+  const u = S.role==="hod" ? S.units.find(x=>x.id===S.hodUnit) : (S.units.find(x=>x.id===S.inputUnit) || S.units[0]);
+  if(!u){ root.appendChild(el("div","panel",'<div class="empty"><h3>No departments yet</h3><p>Add the org structure on the Driver library page first.</p></div>')); return; }
+  S.inputUnit = u.id;
+
+  const acts = [];
+  if(S.role!=="hod"){
+    const sel = el("select"); sel.id="inputdept";
+    sel.innerHTML = S.units.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.code+" "+x.name)+'</option>').join("");
+    sel.value = u.id; sel.onchange = ()=>{ S.inputUnit = sel.value; render(); };
+    acts.push(sel);
+  }
+  acts.push(button("Mark as submitted","primary", async ()=>{
+    const d = unitData(u.id); d.status="submitted"; d.updatedAt=Date.now();
+    await persist("counts",{id:u.id, body:d}); toast("Department marked as submitted"); render();
+  }));
+  root.appendChild(head(u.code+" "+u.name,
+    "Enter the count for each demand driver. Everything else — service time, frequency, complexity, ownership — is set centrally and stays locked.", acts));
+
+  const d = unitData(u.id);
+  const stats = el("div","stats");
+  stats.innerHTML =
+    stat("Required FTE", n1(unitFTE(u,eng,lv)), "this department", "lead") +
+    stat("Filled", n0(u.filled||0), "people in seats") +
+    stat("Gap", (unitFTE(u,eng,lv)-(u.filled||0)>0?"+":"")+n1(unitFTE(u,eng,lv)-(u.filled||0)), "required − filled") +
+    stat("Status", d.status==="submitted"?"Submitted":"Draft", d.updatedAt? new Date(d.updatedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"}) : "not yet returned");
+  stats.id="inputstats";
+  root.appendChild(stats);
+
+  const f = el("div","formula");
+  f.innerHTML = 'Required FTE  =  <b>Count</b> × Frequency × Duration × Service hours × Complexity weight × Ownership %  ÷  '+n0(eng.annualHours)+' annual hours';
+  root.appendChild(f);
+
+  const p = el("div","panel");
+  p.appendChild(el("header",null,'<h2>Demand drivers</h2><span class="sub">'+(u.drivers||[]).length+' drivers across '+(u.subunits||[]).length+' sub-departments. The count column is yours to fill.</span>'));
+  const w = el("div","tblwrap"); w.style.maxHeight="62vh"; w.style.overflowY="auto";
+  let html = '<table><thead><tr><th>Capability</th><th>Demand driver</th><th>Unit counted</th><th class="r">Count</th>'+
+    '<th class="r">Service hrs</th><th>Frequency</th><th class="r">Cx</th><th class="r">Own %</th><th class="r">Required FTE</th></tr></thead><tbody>';
+  (u.subunits||[]).forEach(s=>{
+    const ds = (u.drivers||[]).filter(x=>x.subId===s.id);
+    const sf = ds.reduce((a,x)=>a+driverFTE(x,d.counts[x.id],eng,lv),0);
+    html += '<tr class="grp"><td colspan="8">'+esc(s.code)+' · '+esc(s.name)+'</td><td class="r num" data-sub="'+esc(s.id)+'">'+n1(sf)+'</td></tr>';
+    ds.forEach(x=>{
+      html += '<tr><td class="muted">'+esc(x.capability)+'</td><td>'+esc(x.driver)+'</td><td class="muted">'+esc(x.metric)+'</td>'+
+        '<td class="r"><input class="cellinput num" type="number" min="0" step="1" id="c_'+esc(x.id)+'" data-drv="'+esc(x.id)+'" value="'+(d.counts[x.id]!=null?esc(d.counts[x.id]):"")+'" placeholder="0"></td>'+
+        '<td class="r num muted">'+x.rate+'</td><td class="muted">'+esc(x.freq)+'</td><td class="r num muted">'+x.cx+'</td><td class="r num muted">'+x.own+'</td>'+
+        '<td class="r num" data-fte="'+esc(x.id)+'">'+n1(driverFTE(x,d.counts[x.id],eng,lv))+'</td></tr>';
+    });
+  });
+  html += '</tbody><tfoot><tr><td colspan="8">Department total</td><td class="r num" id="unittotal">'+n1(unitFTE(u,eng,lv))+'</td></tr></tfoot></table>';
+  w.innerHTML = html;
+  p.appendChild(w); root.appendChild(p);
+
+  w.addEventListener("input", e=>{
+    const id = e.target.getAttribute("data-drv"); if(!id) return;
+    const v = e.target.value==="" ? 0 : Number(e.target.value);
+    d.counts[id] = isFinite(v) ? Math.max(0,v) : 0;
+    recalcInput(u, eng, lv);
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(()=>{ d.updatedAt=Date.now(); persist("counts",{id:u.id, body:d}); }, 700);
+  });
+}
+function recalcInput(u, eng, lv){
+  const d = unitData(u.id);
+  (u.drivers||[]).forEach(x=>{
+    const c = document.querySelector('[data-fte="'+x.id+'"]');
+    if(c) c.textContent = n1(driverFTE(x, d.counts[x.id], eng, lv));
+  });
+  (u.subunits||[]).forEach(s=>{
+    const c = document.querySelector('[data-sub="'+s.id+'"]');
+    if(c) c.textContent = n1((u.drivers||[]).filter(x=>x.subId===s.id).reduce((a,x)=>a+driverFTE(x,d.counts[x.id],eng,lv),0));
+  });
+  const tot = unitFTE(u,eng,lv);
+  const tc = document.getElementById("unittotal"); if(tc) tc.textContent = n1(tot);
+  const st = document.getElementById("inputstats");
+  if(st){
+    const vs = st.querySelectorAll(".v");
+    if(vs[0]) vs[0].textContent = n1(tot);
+    if(vs[2]) vs[2].textContent = (tot-(u.filled||0)>0?"+":"")+n1(tot-(u.filled||0));
+  }
+}
+
+/* ============ view: scenarios ============ */
+function vScenarios(root){
+  const eng = engine();
+  const base = S.scenarios.find(s=>s.kind==="baseline") || S.scenarios[0];
+  const cur = scenario();
+  const acts = [];
+  if(S.role==="admin"){
+    acts.push(button("New scenario","primary", async ()=>{
+      const name = prompt("Scenario name", "Scenario "+(S.scenarios.length));
+      if(!name) return;
+      const s = {id:uid("scn"), name:name.trim(), kind:"scenario", basedOn:base?base.id:null,
+                 levers:{demand:0,efficiency:0,ownership:0,cx:0,hours:0}, createdAt:Date.now()};
+      S.scenarios.push(s); S.scenarioId=s.id; await persist("scen",s);
+      await copyCountsFrom(base?base.id:null, s.id);
+      render();
+    }));
+    if(cur && cur.kind!=="baseline"){
+      acts.push(button("Delete","danger", async ()=>{
+        if(!confirm("Delete scenario “"+cur.name+"”?")) return;
+        S.scenarios = S.scenarios.filter(s=>s.id!==cur.id); await purge("scen",cur.id);
+        S.scenarioId = base?base.id:(S.scenarios[0]||{}).id; await pullCounts(); render();
+      }));
+    }
+  }
+  root.appendChild(head("Scenarios",
+    "A scenario reuses the department counts and applies division-wide levers on top. The baseline is never changed.", acts));
+
+  if(!cur){ root.appendChild(el("div","panel",'<div class="empty"><h3>No scenarios</h3></div>')); return; }
+
+  const g = el("div","grid2");
+  const lp = el("div","panel");
+  lp.appendChild(el("header",null,'<h2>'+esc(cur.name)+'</h2><span class="sub">'+(cur.kind==="baseline"?"Baseline — levers are fixed at zero":"Adjust and the comparison updates live")+'</span>'));
+  const lb = el("div","body");
+  if(cur.kind==="baseline"){
+    const others = S.scenarios.filter(s=>s.kind!=="baseline");
+    const q = el("div","note");
+    q.innerHTML = others.length
+      ? "The baseline holds the counts as departments returned them. Open a scenario to model change against it."
+      : "The baseline holds the counts as departments returned them. Create a scenario to model change against it.";
+    lb.appendChild(q);
+    if(others.length){
+      const r = el("div","row"); r.style.marginBottom="12px";
+      others.forEach(o=>r.appendChild(button("Open \u201c"+o.name+"\u201d","sm", async ()=>{
+        S.scenarioId=o.id; await pullCounts(); render();
+      })));
+      lb.appendChild(r);
+    }
+  }
+  const L = Object.assign({demand:0,efficiency:0,ownership:0,cx:0,hours:0}, cur.levers||{});
+  const dis = cur.kind==="baseline" || S.role!=="admin";
+  const defs = [
+    ["demand","Demand growth","%",-50,100,5,"Raises or lowers every count — new assets, higher volumes, a bigger portfolio."],
+    ["efficiency","Service-time efficiency","%",0,60,5,"Cuts the hours each occurrence consumes — automation, tooling, better process."],
+    ["ownership","Ownership shift","pp",-60,40,5,"Moves work in or out of the organisation. Negative outsources it."],
+    ["cx","Complexity shift","levels",-2,2,1,"Shifts every driver up or down the 1–5 complexity scale."]
+  ];
+  defs.forEach(([k,label,unit,min,max,step,hint])=>{
+    const row = el("div","lever");
+    row.innerHTML = '<div class="lbl">'+esc(label)+'</div><div class="num" style="min-width:60px;text-align:right" id="lv_'+k+'">'+
+      (L[k]>0?"+":"")+L[k]+" "+esc(unit)+'</div><input type="range" id="rng_'+k+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+L[k]+'"'+(dis?" disabled":"")+
+      ' style="grid-column:1/-1"><div class="hint">'+esc(hint)+'</div>';
+    lb.appendChild(row);
+    const rng = row.querySelector("input");
+    rng.addEventListener("input", ()=>{
+      L[k] = Number(rng.value);
+      row.querySelector("#lv_"+k).textContent = (L[k]>0?"+":"")+L[k]+" "+unit;
+      cur.levers = L; refreshCompare(eng, base, cur);
+    });
+    rng.addEventListener("change", ()=>{ cur.levers=L; persist("scen",cur); });
+  });
+  const hrow = el("div","lever");
+  hrow.innerHTML = '<div class="lbl">Annual hours per FTE</div><div class="num" style="text-align:right">'+
+    '<input type="number" id="lv_hours" class="cellinput" value="'+(L.hours||eng.annualHours)+'" '+(dis?"disabled":"")+'></div>'+
+    '<div class="hint">Overrides the engine denominator for this scenario only. Engine default is '+n0(eng.annualHours)+'.</div>';
+  lb.appendChild(hrow);
+  hrow.querySelector("input").addEventListener("input", e=>{
+    L.hours = Number(e.target.value)||0; cur.levers=L; refreshCompare(eng, base, cur);
+  });
+  hrow.querySelector("input").addEventListener("change", ()=>persist("scen",cur));
+  lp.appendChild(lb); g.appendChild(lp);
+
+  const rp = el("div","panel"); rp.id="comparepanel";
+  rp.appendChild(el("header",null,'<h2>Against baseline</h2><span class="sub">Required FTE by department</span>'));
+  rp.appendChild(el("div","tblwrap", compareTable(eng, base, cur)));
+  g.appendChild(rp);
+  root.appendChild(g);
+}
+function compareTable(eng, base, cur){
+  const bl = base ? Object.assign({demand:0,efficiency:0,ownership:0,cx:0,hours:0}, base.levers||{}) : {};
+  const cl = Object.assign({demand:0,efficiency:0,ownership:0,cx:0,hours:0}, cur.levers||{});
+  let tb=0, tc=0;
+  const rows = S.units.map(u=>{
+    const b = unitFTE(u,eng,bl), c = unitFTE(u,eng,cl); tb+=b; tc+=c;
+    const dd = c-b;
+    return '<tr><td>'+esc(u.name)+'</td><td class="r num muted">'+n1(b)+'</td><td class="r num">'+n1(c)+
+      '</td><td class="r num" style="color:var(--'+(dd>0.05?"bad":dd<-0.05?"good":"ink3")+')">'+(dd>0?"+":"")+n1(dd)+'</td></tr>';
+  }).join("");
+  const td = tc-tb;
+  return '<table><thead><tr><th>Department</th><th class="r">Baseline</th><th class="r">Scenario</th><th class="r">Δ</th></tr></thead><tbody>'+
+    rows+'</tbody><tfoot><tr><td>Total</td><td class="r num">'+n1(tb)+'</td><td class="r num">'+n1(tc)+
+    '</td><td class="r num">'+(td>0?"+":"")+n1(td)+'</td></tr></tfoot></table>';
+}
+function refreshCompare(eng, base, cur){
+  const p = document.getElementById("comparepanel"); if(!p) return;
+  p.querySelector(".tblwrap").innerHTML = compareTable(eng, base, cur);
+}
+/* ============ view: driver library ============ */
+function vLibrary(root){
+  const acts = [
+    button("Add department","", async ()=>{
+      const name = prompt("Department name"); if(!name) return;
+      const code = prompt("Department code", String(S.units.length+1).padStart(2,"0")) || "";
+      const u = {id:uid("u"), tenantId:S.tenantId, code:code.trim(), name:name.trim(), order:S.units.length,
+                 approved:0, filled:0, subunits:[], drivers:[]};
+      S.units.push(u); S.libUnit = u.id; await persist("unit",u); render();
+    }),
+    button("Import / export","primary", ()=>{ S.libImport = !S.libImport; render(); })
+  ];
+  root.appendChild(head("Driver library",
+    "One library per client. Service time, frequency, complexity and ownership live here — department heads only ever type counts.", acts));
+
+  if(S.libImport) root.appendChild(importPanel());
+
+  const u = S.units.find(x=>x.id===S.libUnit) || S.units[0];
+  const p = el("div","panel");
+  p.appendChild(el("header",null,'<h2>Departments</h2><span class="sub">Approved and filled headcount feed the dashboard gap.</span>'));
+  const w = el("div","tblwrap");
+  w.innerHTML = '<table><thead><tr><th>Code</th><th>Department</th><th class="r">Sub-depts</th><th class="r">Drivers</th>'+
+    '<th class="r">Approved</th><th class="r">Filled</th><th></th></tr></thead><tbody>'+
+    S.units.map(x=>'<tr'+(u&&x.id===u.id?' style="background:var(--accent-wash)"':'')+'><td class="num">'+esc(x.code)+'</td>'+
+      '<td><a href="#" data-pick="'+esc(x.id)+'" style="color:inherit">'+esc(x.name)+'</a></td>'+
+      '<td class="r num muted">'+(x.subunits||[]).length+'</td><td class="r num muted">'+(x.drivers||[]).length+'</td>'+
+      '<td class="r"><input class="cellinput num" style="width:66px" type="number" min="0" data-hc="approved" data-u="'+esc(x.id)+'" value="'+(x.approved||0)+'"></td>'+
+      '<td class="r"><input class="cellinput num" style="width:66px" type="number" min="0" data-hc="filled" data-u="'+esc(x.id)+'" value="'+(x.filled||0)+'"></td>'+
+      '<td class="r"><button class="btn sm danger" data-del="'+esc(x.id)+'">Remove</button></td></tr>').join("")+
+    '</tbody></table>';
+  w.addEventListener("click", async e=>{
+    const pick = e.target.getAttribute("data-pick");
+    if(pick){ e.preventDefault(); S.libUnit=pick; render(); return; }
+    const del = e.target.getAttribute("data-del");
+    if(del){
+      const x = S.units.find(y=>y.id===del);
+      if(!confirm("Remove "+x.name+" and its "+(x.drivers||[]).length+" drivers?")) return;
+      S.units = S.units.filter(y=>y.id!==del); await purge("unit",del); render();
+    }
+  });
+  w.addEventListener("change", async e=>{
+    const f = e.target.getAttribute("data-hc"); if(!f) return;
+    const x = S.units.find(y=>y.id===e.target.getAttribute("data-u"));
+    x[f] = Number(e.target.value)||0; await persist("unit",x);
+  });
+  p.appendChild(w); root.appendChild(p);
+
+  if(!u) return;
+  const dp = el("div","panel");
+  const hdr = el("header",null,'<h2>'+esc(u.code+" "+u.name)+'</h2><span class="sub">Editing this department’s drivers</span>');
+  const ha = el("div","row");
+  ha.appendChild(button("Add sub-department","sm", async ()=>{
+    const name = prompt("Sub-department name"); if(!name) return;
+    const code = prompt("Sub-department code", u.code+"."+((u.subunits||[]).length+1)) || "";
+    u.subunits = u.subunits||[]; u.subunits.push({id:uid("s"), code:code.trim(), name:name.trim(), order:u.subunits.length});
+    await persist("unit",u); render();
+  }));
+  ha.appendChild(button("Add driver","sm", async ()=>{
+    if(!(u.subunits||[]).length){ toast("Add a sub-department first"); return; }
+    u.drivers = u.drivers||[];
+    u.drivers.push({id:uid("d"), subId:u.subunits[0].id, capability:"Operate", driver:"New demand driver",
+                    metric:"Units handled", rate:1, freq:"Monthly", len:1, cx:3, own:100});
+    await persist("unit",u); render();
+  }));
+  hdr.appendChild(ha); dp.appendChild(hdr);
+
+  const dw = el("div","tblwrap"); dw.style.maxHeight="58vh"; dw.style.overflowY="auto";
+  const subOpts = (sel)=> (u.subunits||[]).map(s=>'<option value="'+esc(s.id)+'"'+(s.id===sel?" selected":"")+'>'+esc(s.code)+'</option>').join("");
+  const freqOpts = (sel)=> FREQ_KEYS.map(f=>'<option'+(f===sel?" selected":"")+'>'+esc(f)+'</option>').join("");
+  dw.innerHTML = '<table><thead><tr><th>Sub</th><th>Capability</th><th>Demand driver</th><th>Unit counted</th>'+
+    '<th class="r">Service hrs</th><th>Frequency</th><th class="r">Duration</th><th class="r">Cx</th><th class="r">Own %</th><th></th></tr></thead><tbody>'+
+    (u.drivers||[]).map(d=>'<tr data-d="'+esc(d.id)+'">'+
+      '<td><select data-f="subId" style="max-width:88px">'+subOpts(d.subId)+'</select></td>'+
+      '<td><input type="text" data-f="capability" value="'+esc(d.capability)+'" style="width:88px"></td>'+
+      '<td><input type="text" data-f="driver" value="'+esc(d.driver)+'" style="width:210px"></td>'+
+      '<td><input type="text" data-f="metric" value="'+esc(d.metric)+'" style="width:150px"></td>'+
+      '<td class="r"><input class="cellinput num" style="width:66px" type="number" step="0.01" min="0" data-f="rate" value="'+esc(d.rate)+'"></td>'+
+      '<td><select data-f="freq">'+freqOpts(d.freq)+'</select></td>'+
+      '<td class="r"><input class="cellinput num" style="width:58px" type="number" step="0.5" min="0" data-f="len" value="'+esc(d.len||1)+'"></td>'+
+      '<td class="r"><input class="cellinput num" style="width:48px" type="number" min="1" max="5" data-f="cx" value="'+esc(d.cx)+'"></td>'+
+      '<td class="r"><input class="cellinput num" style="width:58px" type="number" min="0" max="100" data-f="own" value="'+esc(d.own)+'"></td>'+
+      '<td class="r"><button class="btn sm ghost" data-rm="'+esc(d.id)+'">✕</button></td></tr>').join("")+
+    '</tbody></table>';
+  dw.addEventListener("change", async e=>{
+    const f = e.target.getAttribute("data-f"); if(!f) return;
+    const id = e.target.closest("tr").getAttribute("data-d");
+    const d = u.drivers.find(x=>x.id===id);
+    d[f] = ["rate","len","cx","own"].indexOf(f)>=0 ? Number(e.target.value)||0 : e.target.value;
+    await persist("unit",u);
+  });
+  dw.addEventListener("click", async e=>{
+    const rm = e.target.getAttribute("data-rm"); if(!rm) return;
+    u.drivers = u.drivers.filter(x=>x.id!==rm); await persist("unit",u); render();
+  });
+  dp.appendChild(dw);
+  if(!(u.drivers||[]).length) dp.appendChild(el("div","empty",'<h3>No drivers yet</h3><p>Add them here, or import the whole library from your workbook.</p>'));
+  root.appendChild(dp);
+}
+
+/* ============ import / export ============ */
+const IMPORT_COLS = ["Department code","Department","Sub-department code","Sub-department","Capability","Demand driver","Unit counted","Service hours","Frequency","Duration","Complexity","Ownership %"];
+function importPanel(){
+  const p = el("div","panel");
+  p.appendChild(el("header",null,'<h2>Import from your workbook</h2><span class="sub">One row per driver. Paste from Excel (tab-separated) or CSV.</span>'));
+  const b = el("div","body");
+  b.appendChild(el("div","note","<b>Columns, in order:</b> "+IMPORT_COLS.join(" · ")+". A header row is detected and skipped. Importing replaces the whole library for this client."));
+  const ta = el("textarea"); ta.rows=7; ta.id="importbox";
+  ta.placeholder = IMPORT_COLS.join(",")+"\n01,Strategy & Governance,01.1,Portfolio Management,Govern,Portfolio intake,Requests triaged,6,Weekly,1,3,100";
+  b.appendChild(ta);
+  const row = el("div","row"); row.style.marginTop="10px";
+  const file = el("input"); file.type="file"; file.accept=".csv,.txt,.tsv"; file.style.fontSize="12.5px";
+  file.onchange = ()=>{ const f=file.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ ta.value=r.result; toast("File loaded — review, then import"); }; r.readAsText(f); };
+  row.appendChild(file);
+  row.appendChild(button("Import library","primary", ()=>doImport(ta.value)));
+  row.appendChild(button("Export current library","", exportLibrary));
+  row.appendChild(button("Export results","", exportResults));
+  row.appendChild(button("Close","ghost", ()=>{ S.libImport=false; render(); }));
+  b.appendChild(row);
+  p.appendChild(b); return p;
+}
+function parseDelimited(text){
+  const lines = text.replace(/\r/g,"").split("\n").filter(l=>l.trim().length);
+  if(!lines.length) return [];
+  const delim = (lines[0].split("\t").length > lines[0].split(",").length) ? "\t" : ",";
+  return lines.map(line=>{
+    const out=[]; let cur="", q=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(q){ if(ch==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+      else if(ch==='"') q=true;
+      else if(ch===delim){ out.push(cur); cur=""; }
+      else cur+=ch;
+    }
+    out.push(cur); return out.map(s=>s.trim());
+  });
+}
+async function doImport(text){
+  const rows = parseDelimited(text);
+  if(rows.length<2){ toast("Nothing to import — paste at least one data row"); return; }
+  if(/department/i.test(rows[0][0]||"") || /code/i.test(rows[0][0]||"")) rows.shift();
+  const units = {}; let order=0, bad=0;
+  rows.forEach(r=>{
+    if(r.length<6 || !r[1]){ bad++; return; }
+    const ucode = r[0]||"", uname = r[1];
+    const key = ucode+"|"+uname;
+    if(!units[key]) units[key] = {id:uid("u"), tenantId:S.tenantId, code:ucode, name:uname, order:order++, approved:0, filled:0, subunits:[], drivers:[]};
+    const u = units[key];
+    const scode = r[2]||"", sname = r[3]||"General";
+    let sub = u.subunits.find(s=>s.code===scode && s.name===sname);
+    if(!sub){ sub = {id:uid("s"), code:scode, name:sname, order:u.subunits.length}; u.subunits.push(sub); }
+    const freq = FREQ_KEYS.find(f=>f.toLowerCase()===String(r[8]||"").toLowerCase()) || "Monthly";
+    u.drivers.push({id:uid("d"), subId:sub.id, capability:r[4]||"", driver:r[5]||"", metric:r[6]||"",
+      rate:Number(r[7])||0, freq:freq, len:Number(r[9])||1, cx:clamp(Math.round(Number(r[10])||3),1,5), own:clamp(Number(r[11])||100,0,100)});
+  });
+  const list = Object.values(units);
+  if(!list.length){ toast("No valid rows found"); return; }
+  if(!confirm("Import "+list.length+" departments and "+list.reduce((a,u)=>a+u.drivers.length,0)+" drivers? This replaces the current library.")) return;
+  for(const old of S.units) await purge("unit", old.id);
+  S.units = list; S.data = {}; S.libUnit = list[0].id; S.libImport = false;
+  for(const u of list) await persist("unit", u);
+  toast("Imported "+list.length+" departments"+(bad?" ("+bad+" rows skipped)":""));
+  render();
+}
+function toCSV(rows){
+  return rows.map(r=>r.map(c=>{ const s=String(c==null?"":c); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; }).join(",")).join("\n");
+}
+async function offerFile(filename, text){
+  let d = null;
+  try{ if(window.claude && window.claude.use) d = await window.claude.use("downloads"); }catch(e){}
+  if(d){ try{ await d.save({filename, data:text}); toast("Saved"); return; }catch(e){} }
+  try{
+    const blob = new Blob([text], {type:"text/csv;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    toast("Downloaded " + filename); return;
+  }catch(e){}
+  const box = document.getElementById("importbox");
+  if(box){ box.value = text; toast("Download blocked here — copy the text from the box above"); }
+  else toast("Download unavailable in this view");
+}
+function exportLibrary(){
+  const rows = [IMPORT_COLS];
+  S.units.forEach(u=>(u.drivers||[]).forEach(d=>{
+    const s = (u.subunits||[]).find(x=>x.id===d.subId)||{};
+    rows.push([u.code,u.name,s.code||"",s.name||"",d.capability,d.driver,d.metric,d.rate,d.freq,d.len,d.cx,d.own]);
+  }));
+  offerFile((tenant()?tenant().code||"client":"client")+"_driver_library.csv", toCSV(rows));
+}
+function exportResults(){
+  const eng = engine(), lv = levers();
+  const rows = [["Department code","Department","Sub-department","Demand driver","Count","Required FTE"]];
+  S.units.forEach(u=>{
+    const cts = unitData(u.id).counts;
+    (u.drivers||[]).forEach(d=>{
+      const s = (u.subunits||[]).find(x=>x.id===d.subId)||{};
+      rows.push([u.code,u.name,s.name||"",d.driver, cts[d.id]||0, n1(driverFTE(d,cts[d.id],eng,lv))]);
+    });
+  });
+  const t = totals(eng,lv);
+  rows.push([],["Total required FTE",n1(t.req)],["Filled",t.filled],["Approved",t.approved],["Gap",n1(t.gap)]);
+  offerFile((tenant()?tenant().code||"client":"client")+"_"+(scenario()?scenario().name.replace(/\W+/g,"_"):"results")+".csv", toCSV(rows));
+}
+
+/* ============ view: engine settings ============ */
+function vEngine(root){
+  const t = tenant(); const eng = engine();
+  root.appendChild(head("Engine settings",
+    "The denominator and the weights every department form inherits. Change them once here, not in fifteen copies of a workbook."));
+
+  const g = el("div","grid2");
+
+  const dp = el("div","panel");
+  dp.appendChild(el("header",null,'<h2>FTE denominator</h2><span class="sub">Effective productive hours one full-time person supplies in a year</span>'));
+  const db_ = el("div","body");
+  const kv = el("div","kv");
+  kv.innerHTML = '<dt>Hours per working day</dt><dd><input class="cellinput num" style="width:64px" type="number" step="0.5" id="e_hpd" value="'+eng.hoursPerDay+'"></dd>'+
+    '<dt>Effective working days</dt><dd><input class="cellinput num" style="width:64px" type="number" id="e_days" value="'+eng.workingDays+'"></dd>'+
+    '<dt><b>Annual hours per FTE</b></dt><dd class="num" id="e_total" style="font-weight:600;color:var(--accent)">'+n0(eng.annualHours)+'</dd>';
+  db_.appendChild(kv);
+  db_.appendChild(el("div","note", esc(eng.daysBasis)));
+  const recompute = ()=>{
+    const h = Number(document.getElementById("e_hpd").value)||0;
+    const d = Number(document.getElementById("e_days").value)||0;
+    document.getElementById("e_total").textContent = n0(h*d);
+  };
+  db_.addEventListener("input", recompute);
+  db_.addEventListener("change", async ()=>{
+    const h = Number(document.getElementById("e_hpd").value)||0;
+    const d = Number(document.getElementById("e_days").value)||0;
+    t.engine = Object.assign({}, t.engine||{}, {hoursPerDay:h, workingDays:d, annualHours:Math.round(h*d)});
+    await persist("tenant",t); toast("Denominator updated — every department recalculates");
+  });
+  dp.appendChild(db_); g.appendChild(dp);
+
+  const cp = el("div","panel");
+  cp.appendChild(el("header",null,'<h2>Complexity weights</h2><span class="sub">Applied per driver on a 1–5 scale</span>'));
+  const cb = el("div","body"); const ck = el("div","kv");
+  ck.innerHTML = [1,2,3,4,5].map(i=>'<dt>'+i+' · '+esc(eng.cxLabels[i])+'</dt><dd><input class="cellinput num" style="width:64px" type="number" step="0.05" min="0" data-cx="'+i+'" value="'+eng.cx[i]+'"></dd>').join("");
+  cb.appendChild(ck);
+  cb.addEventListener("change", async e=>{
+    const i = e.target.getAttribute("data-cx"); if(!i) return;
+    const cx = Object.assign({}, eng.cx); cx[i] = Number(e.target.value)||1;
+    t.engine = Object.assign({}, t.engine||{}, {cx});
+    await persist("tenant",t); toast("Complexity weights updated"); render();
+  });
+  cp.appendChild(cb); g.appendChild(cp);
+
+  const fp = el("div","panel");
+  fp.appendChild(el("header",null,'<h2>Frequency factors</h2><span class="sub">Occurrences per year behind each label</span>'));
+  const fb = el("div","body"); const fk = el("div","kv");
+  fk.innerHTML = FREQ_KEYS.map(f=>'<dt>'+esc(f)+'</dt><dd><input class="cellinput num" style="width:64px" type="number" step="1" min="0" data-fq="'+esc(f)+'" value="'+eng.freq[f]+'"></dd>').join("");
+  fb.appendChild(fk);
+  fb.addEventListener("change", async e=>{
+    const f = e.target.getAttribute("data-fq"); if(!f) return;
+    const fr = Object.assign({}, eng.freq); fr[f] = Number(e.target.value)||0;
+    t.engine = Object.assign({}, t.engine||{}, {freq:fr});
+    await persist("tenant",t); toast("Frequency factors updated");
+  });
+  fp.appendChild(fb); g.appendChild(fp);
+
+  const mp = el("div","panel");
+  mp.appendChild(el("header",null,'<h2>Calculation</h2><span class="sub">The single engine every form runs on</span>'));
+  const mb = el("div","body");
+  const f = el("div","formula");
+  f.innerHTML = 'Workload hours = Count × Frequency × Duration × Service hours × Complexity weight × Ownership %<br>'+
+                'Required FTE  = Workload hours ÷ <b>'+n0(eng.annualHours)+'</b>';
+  mb.appendChild(f);
+  mb.appendChild(el("p","tiny","Service hours are the effort one occurrence consumes. Duration carries multi-period initiatives. Ownership is the share of the work this organisation performs itself."));
+  mp.appendChild(mb); g.appendChild(mp);
+
+  root.appendChild(g);
+}
+
+/* ============ view: clients ============ */
+function vClients(root){
+  root.appendChild(head("Clients",
+    "Each client gets its own org structure, driver library, engine settings and scenarios. Nothing is shared between them.",
+    [button("New client","primary", createClient)]));
+  const p = el("div","panel");
+  const w = el("div","tblwrap");
+  w.innerHTML = '<table><thead><tr><th>Client</th><th>Code</th><th class="r">Departments</th><th></th></tr></thead><tbody>'+
+    S.tenants.map(t=>'<tr><td><b>'+esc(t.name)+'</b>'+(t.sample?' <span class="chip">sample</span>':'')+'</td><td class="num muted">'+esc(t.code||"")+
+      '</td><td class="r num muted">'+(t.id===S.tenantId?S.units.length:"—")+'</td>'+
+      '<td class="r"><button class="btn sm" data-open="'+esc(t.id)+'">Open</button> <button class="btn sm danger" data-del="'+esc(t.id)+'">Delete</button></td></tr>').join("")+
+    '</tbody></table>';
+  w.addEventListener("click", async e=>{
+    const o = e.target.getAttribute("data-open");
+    if(o){ await pullTenant(o); S.view="dashboard"; render(); return; }
+    const d = e.target.getAttribute("data-del");
+    if(d){
+      const t = S.tenants.find(x=>x.id===d);
+      if(!confirm("Delete "+t.name+"? Its library, counts and scenarios go with it.")) return;
+      S.tenants = S.tenants.filter(x=>x.id!==d); await purge("tenant",d);
+      if(S.tenantId===d){ S.tenantId = (S.tenants[0]||{}).id||null; if(S.tenantId) await pullTenant(S.tenantId); else { S.units=[];S.scenarios=[];S.data={}; } }
+      render();
+    }
+  });
+  p.appendChild(w); root.appendChild(p);
+  if(!S.tenants.some(t=>t.sample)){
+    const row = el("div","row");
+    row.appendChild(button("Load sample structure","ghost", seedSample));
+    root.appendChild(row);
+  }
+}
+async function createClient(){
+  const name = prompt("Client name"); if(!name) return;
+  const code = (prompt("Short code", name.split(/\s+/).map(w=>w[0]).join("").toUpperCase().slice(0,6))||"").trim();
+  const t = {id:uid("t"), name:name.trim(), code, engine:{}, createdAt:Date.now()};
+  const base = {id:uid(), name:"Baseline", kind:"baseline", levers:{}, createdAt:Date.now()};
+  S.tenants.push(t); S.tenantId=t.id; S.units=[]; S.scenarios=[base]; S.scenarioId=base.id; S.data={};
+  await persist("tenant",t); await persist("scen",base);
+  S.view="library"; S.libImport=true; render();
+}
+async function seedSample(){
+  const s = buildSample();
+  const existing = S.tenants.find(t=>t.sample);
+  if(existing){ await pullTenant(existing.id); render(); return; }
+  S.tenants.push(s.tenant); S.tenantId=s.tenant.id; S.units=s.units; S.scenarios=s.scenarios; S.data=s.data; S.scenarioId=s.scenarios[0].id;
+  await persist("tenant", s.tenant);
+  for(const u of s.units) await persist("unit", u);
+  for(const sc of s.scenarios) await persist("scen", sc);
+  for(const u of s.units) await persist("counts", {id:u.id, body:s.data[u.id]});
+  S.view="dashboard"; toast("Sample structure loaded"); render();
+}
+
+/* ============ environment + sign-in ============ */
+function envLabel(){
+  const cfg = window.WDE_CONFIG || {};
+  if(Store.kind === "supabase") return cfg.environment || "Live";
+  if(Store.kind === "claude")   return "Claude workspace";
+  return "Local demo";
+}
+function chip(text, kind){
+  const c = $("#storechip"); c.textContent = text; c.className = "chip " + (kind || "");
+}
+function renderSignIn(message){
+  document.querySelector(".rail").hidden = true;
+  document.querySelector(".topbar").hidden = true;
+  const v = $("#view"); v.innerHTML = "";
+  const p = el("div","panel"); p.style.maxWidth = "380px"; p.style.margin = "8vh auto 0";
+  p.appendChild(el("header", null, "<h2>Sign in</h2><span class=\"sub\">Workforce Demand Engine</span>"));
+  const b = el("div","body");
+  b.innerHTML = '<div class="kv" style="grid-template-columns:1fr">'+
+    '<label for="si_email" class="tiny">Email</label><input type="text" id="si_email" autocomplete="username" style="width:100%">'+
+    '<label for="si_pw" class="tiny" style="margin-top:8px">Password</label><input type="password" id="si_pw" autocomplete="current-password" style="width:100%">'+
+    '</div>';
+  const err = el("div","tiny"); err.style.color = "var(--bad)"; err.style.minHeight = "18px"; err.style.marginTop = "8px";
+  if(message) err.textContent = message;
+  b.appendChild(err);
+  const go = button("Sign in","primary", async ()=>{
+    err.textContent = "";
+    go.disabled = true; go.textContent = "Signing in…";
+    try{
+      Store.session = await Store.impl.signIn($("#si_email").value.trim(), $("#si_pw").value);
+      document.querySelector(".rail").hidden = false;
+      document.querySelector(".topbar").hidden = false;
+      await start();
+    }catch(e){
+      go.disabled = false; go.textContent = "Sign in";
+      err.textContent = (e && e.message) ? e.message : "Sign-in failed";
+    }
+  });
+  go.style.marginTop = "12px";
+  b.appendChild(go);
+  b.appendChild(el("p","tiny","Accounts are created by your administrator. Each person sees only the client — and, for department heads, only the department — they are assigned to."));
+  p.appendChild(b); v.appendChild(p);
+  const q = $("#si_pw"); if(q) q.addEventListener("keydown", e=>{ if(e.key==="Enter") go.click(); });
+}
+
+/* ============ boot ============ */
+async function start(){
+  await pullTenants();
+  if(!S.tenants.length){
+    if(Store.kind === "local"){
+      const s = buildSample();
+      S.tenants=[s.tenant]; S.tenantId=s.tenant.id; S.units=s.units;
+      S.scenarios=s.scenarios; S.scenarioId=s.scenarios[0].id; S.data=s.data;
+      await persist("tenant", s.tenant);
+      for(const u of s.units) await persist("unit", u);
+      for(const sc of s.scenarios) await persist("scen", sc);
+      for(const u of s.units) await persist("counts", {id:u.id, body:s.data[u.id]});
+    }else{
+      S.tenantId = null; S.units=[]; S.scenarios=[]; S.data={};
+    }
+  }else{
+    await pullTenant(S.tenants[0].id);
+  }
+  S.ready = true;
+  chip(storeMessage(), storeTone());
+  render();
+}
+function storeMessage(){
+  if(Store.kind === "supabase") return Store.session ? (Store.session.email || "Signed in") : "Not signed in";
+  if(Store.kind === "claude")   return "Saved for everyone with access";
+  return "Saved in this browser only";
+}
+function storeTone(){
+  if(Store.kind === "supabase") return Store.error ? "bad" : "good";
+  if(Store.kind === "claude")   return "good";
+  return "warn";
+}
+
+(async function boot(){
+  if(booted) return; booted = true;
+  await Store.init();
+  if(Store.kind === "supabase"){
+    if(Store.error){ renderSignIn(Store.error); return; }
+    if(!Store.session){ renderSignIn(); return; }
+  }
+  try{ await start(); }
+  catch(e){
+    chip("Could not load — " + msg(e), "bad");
+    loadSampleIntoState(); S.ready = true; render();
+  }
+})();
+})();
+</script>
+</body>
+</html>
