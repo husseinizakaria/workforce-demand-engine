@@ -198,6 +198,17 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   .scroller{padding:16px}
   .main{overflow:visible}
 }
+
+/* ---------- library: inline add rows and selection ---------- */
+.addrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:11px 16px;border-top:1px solid var(--line-soft);background:var(--surface2)}
+.addrow .addlbl{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);white-space:nowrap}
+.addrow input{background:var(--surface)}
+tr.sel td{background:var(--accent-wash)}
+tr.sel:hover td{background:var(--accent-wash)}
+tr.addline td{background:var(--surface2);padding:5px 10px}
+tr.addline:hover td{background:var(--surface2)}
+td input.count{background:var(--accent-wash);border-color:var(--accent);font-weight:500}
+td input.count:focus{background:var(--surface)}
 </style>
 </head>
 <body>
@@ -1109,102 +1120,228 @@ function refreshCompare(eng, base, cur){
   p.querySelector(".tblwrap").innerHTML = compareTable(eng, base, cur);
 }
 /* ============ view: driver library ============ */
+let libSaveTimer = null;
+function queueUnitSave(u){
+  clearTimeout(libSaveTimer);
+  libSaveTimer = setTimeout(()=>persist("unit", u), 700);
+}
+let cntSaveTimer = null;
+function queueCountSave(u){
+  clearTimeout(cntSaveTimer);
+  cntSaveTimer = setTimeout(()=>{
+    const d = unitData(u.id); d.updatedAt = Date.now();
+    persist("counts", {id:u.id, body:d});
+  }, 700);
+}
+
 function vLibrary(root){
-  const acts = [
-    button("Add department","", async ()=>{
-      const name = prompt("Department name"); if(!name) return;
-      const code = prompt("Department code", String(S.units.length+1).padStart(2,"0")) || "";
-      const u = {id:uid("u"), tenantId:S.tenantId, code:code.trim(), name:name.trim(), order:S.units.length,
-                 approved:0, filled:0, subunits:[], drivers:[]};
-      S.units.push(u); S.libUnit = u.id; await persist("unit",u); render();
-    }),
-    button("Import / export","primary", ()=>{ S.libImport = !S.libImport; render(); })
-  ];
+  const eng = engine(), lv = levers();
   root.appendChild(head("Driver library",
-    "One library per client. Service time, frequency, complexity and ownership live here — department heads only ever type counts.", acts));
+    "Build the structure by hand or import it. Service time, frequency, complexity and ownership live here — department heads only ever type counts.",
+    [button(S.libImport ? "Hide import" : "Import / export", S.libImport?"":"primary", ()=>{ S.libImport = !S.libImport; render(); })]));
 
   if(S.libImport) root.appendChild(importPanel());
 
+  /* ---------- departments ---------- */
   const u = S.units.find(x=>x.id===S.libUnit) || S.units[0];
-  const p = el("div","panel");
-  p.appendChild(el("header",null,'<h2>Departments</h2><span class="sub">Approved and filled headcount feed the dashboard gap.</span>'));
-  const w = el("div","tblwrap");
-  w.innerHTML = '<table><thead><tr><th>Code</th><th>Department</th><th class="r">Sub-depts</th><th class="r">Drivers</th>'+
+  const dp = el("div","panel");
+  dp.appendChild(el("header",null,'<h2>Departments</h2><span class="sub">Approved and filled headcount feed the gap on the dashboard. Click a name to edit its drivers.</span>'));
+  const dw = el("div","tblwrap");
+  dw.innerHTML = '<table><thead><tr><th style="width:80px">Code</th><th>Department</th>'+
+    '<th class="r">Sub-depts</th><th class="r">Drivers</th><th class="r">Required FTE</th>'+
     '<th class="r">Approved</th><th class="r">Filled</th><th></th></tr></thead><tbody>'+
-    S.units.map(x=>'<tr'+(u&&x.id===u.id?' style="background:var(--accent-wash)"':'')+'><td class="num">'+esc(x.code)+'</td>'+
-      '<td><a href="#" data-pick="'+esc(x.id)+'" style="color:inherit">'+esc(x.name)+'</a></td>'+
-      '<td class="r num muted">'+(x.subunits||[]).length+'</td><td class="r num muted">'+(x.drivers||[]).length+'</td>'+
-      '<td class="r"><input class="cellinput num" style="width:66px" type="number" min="0" data-hc="approved" data-u="'+esc(x.id)+'" value="'+(x.approved||0)+'"></td>'+
-      '<td class="r"><input class="cellinput num" style="width:66px" type="number" min="0" data-hc="filled" data-u="'+esc(x.id)+'" value="'+(x.filled||0)+'"></td>'+
+    S.units.map(x=>'<tr'+(u&&x.id===u.id?' class="sel"':'')+' data-u="'+esc(x.id)+'">'+
+      '<td><input class="cellinput num" style="width:62px;text-align:left" type="text" data-uf="code" value="'+esc(x.code||"")+'"></td>'+
+      '<td><input class="cellinput" style="width:100%;max-width:280px;text-align:left" type="text" data-uf="name" value="'+esc(x.name)+'">'+
+        ' <button class="btn sm ghost" data-pick="'+esc(x.id)+'">edit drivers</button></td>'+
+      '<td class="r num muted">'+(x.subunits||[]).length+'</td>'+
+      '<td class="r num muted">'+(x.drivers||[]).length+'</td>'+
+      '<td class="r num" data-ufte="'+esc(x.id)+'">'+n1(unitFTE(x,eng,lv))+'</td>'+
+      '<td class="r"><input class="cellinput num" style="width:66px" type="number" min="0" data-uf="approved" value="'+(x.approved||0)+'"></td>'+
+      '<td class="r"><input class="cellinput num" style="width:66px" type="number" min="0" data-uf="filled" value="'+(x.filled||0)+'"></td>'+
       '<td class="r"><button class="btn sm danger" data-del="'+esc(x.id)+'">Remove</button></td></tr>').join("")+
     '</tbody></table>';
-  w.addEventListener("click", async e=>{
+  dp.appendChild(dw);
+
+  const af = el("div","addrow");
+  af.innerHTML = '<span class="addlbl">Add department</span>'+
+    '<input type="text" id="nd_code" placeholder="Code" style="width:74px">'+
+    '<input type="text" id="nd_name" placeholder="Department name" style="flex:1;min-width:150px">'+
+    '<input type="number" id="nd_appr" placeholder="Approved" min="0" style="width:96px">'+
+    '<input type="number" id="nd_fill" placeholder="Filled" min="0" style="width:88px">';
+  const addBtn = button("Add","primary", async ()=>{
+    const name = $("#nd_name").value.trim();
+    if(!name){ toast("Give the department a name"); $("#nd_name").focus(); return; }
+    const nu = {id:uid(), tenantId:S.tenantId, code:$("#nd_code").value.trim(), name:name,
+                order:S.units.length, approved:Number($("#nd_appr").value)||0, filled:Number($("#nd_fill").value)||0,
+                subunits:[{id:uid(), code:"", name:"General", order:0}], drivers:[]};
+    S.units.push(nu); S.libUnit = nu.id;
+    await persist("unit", nu); toast("Added "+name); render();
+  });
+  af.appendChild(addBtn);
+  dp.appendChild(af);
+  root.appendChild(dp);
+
+  dw.addEventListener("click", async e=>{
     const pick = e.target.getAttribute("data-pick");
-    if(pick){ e.preventDefault(); S.libUnit=pick; render(); return; }
+    if(pick){ S.libUnit = pick; render(); return; }
     const del = e.target.getAttribute("data-del");
     if(del){
       const x = S.units.find(y=>y.id===del);
       if(!confirm("Remove "+x.name+" and its "+(x.drivers||[]).length+" drivers?")) return;
-      S.units = S.units.filter(y=>y.id!==del); await purge("unit",del); render();
+      S.units = S.units.filter(y=>y.id!==del);
+      if(S.libUnit===del) S.libUnit = (S.units[0]||{}).id;
+      await purge("unit", del); render();
     }
   });
-  w.addEventListener("change", async e=>{
-    const f = e.target.getAttribute("data-hc"); if(!f) return;
-    const x = S.units.find(y=>y.id===e.target.getAttribute("data-u"));
-    x[f] = Number(e.target.value)||0; await persist("unit",x);
+  dw.addEventListener("input", e=>{
+    const f = e.target.getAttribute("data-uf"); if(!f) return;
+    const x = S.units.find(y=>y.id===e.target.closest("tr").getAttribute("data-u"));
+    x[f] = (f==="approved"||f==="filled") ? (Number(e.target.value)||0) : e.target.value;
+    queueUnitSave(x);
   });
-  p.appendChild(w); root.appendChild(p);
 
-  if(!u) return;
-  const dp = el("div","panel");
-  const hdr = el("header",null,'<h2>'+esc(u.code+" "+u.name)+'</h2><span class="sub">Editing this department’s drivers</span>');
-  const ha = el("div","row");
-  ha.appendChild(button("Add sub-department","sm", async ()=>{
-    const name = prompt("Sub-department name"); if(!name) return;
-    const code = prompt("Sub-department code", u.code+"."+((u.subunits||[]).length+1)) || "";
-    u.subunits = u.subunits||[]; u.subunits.push({id:uid("s"), code:code.trim(), name:name.trim(), order:u.subunits.length});
-    await persist("unit",u); render();
-  }));
-  ha.appendChild(button("Add driver","sm", async ()=>{
-    if(!(u.subunits||[]).length){ toast("Add a sub-department first"); return; }
-    u.drivers = u.drivers||[];
-    u.drivers.push({id:uid("d"), subId:u.subunits[0].id, capability:"Operate", driver:"New demand driver",
-                    metric:"Units handled", rate:1, freq:"Monthly", len:1, cx:3, own:100});
-    await persist("unit",u); render();
-  }));
-  hdr.appendChild(ha); dp.appendChild(hdr);
+  if(!u){
+    root.appendChild(el("div","panel",'<div class="empty"><h3>No departments yet</h3><p>Add one above, or import a whole library.</p></div>'));
+    return;
+  }
 
-  const dw = el("div","tblwrap"); dw.style.maxHeight="58vh"; dw.style.overflowY="auto";
-  const subOpts = (sel)=> (u.subunits||[]).map(s=>'<option value="'+esc(s.id)+'"'+(s.id===sel?" selected":"")+'>'+esc(s.code)+'</option>').join("");
-  const freqOpts = (sel)=> FREQ_KEYS.map(f=>'<option'+(f===sel?" selected":"")+'>'+esc(f)+'</option>').join("");
-  dw.innerHTML = '<table><thead><tr><th>Sub</th><th>Capability</th><th>Demand driver</th><th>Unit counted</th>'+
-    '<th class="r">Service hrs</th><th>Frequency</th><th class="r">Duration</th><th class="r">Cx</th><th class="r">Own %</th><th></th></tr></thead><tbody>'+
-    (u.drivers||[]).map(d=>'<tr data-d="'+esc(d.id)+'">'+
-      '<td><select data-f="subId" style="max-width:88px">'+subOpts(d.subId)+'</select></td>'+
-      '<td><input type="text" data-f="capability" value="'+esc(d.capability)+'" style="width:88px"></td>'+
-      '<td><input type="text" data-f="driver" value="'+esc(d.driver)+'" style="width:210px"></td>'+
-      '<td><input type="text" data-f="metric" value="'+esc(d.metric)+'" style="width:150px"></td>'+
-      '<td class="r"><input class="cellinput num" style="width:66px" type="number" step="0.01" min="0" data-f="rate" value="'+esc(d.rate)+'"></td>'+
-      '<td><select data-f="freq">'+freqOpts(d.freq)+'</select></td>'+
-      '<td class="r"><input class="cellinput num" style="width:58px" type="number" step="0.5" min="0" data-f="len" value="'+esc(d.len||1)+'"></td>'+
-      '<td class="r"><input class="cellinput num" style="width:48px" type="number" min="1" max="5" data-f="cx" value="'+esc(d.cx)+'"></td>'+
-      '<td class="r"><input class="cellinput num" style="width:58px" type="number" min="0" max="100" data-f="own" value="'+esc(d.own)+'"></td>'+
-      '<td class="r"><button class="btn sm ghost" data-rm="'+esc(d.id)+'">✕</button></td></tr>').join("")+
-    '</tbody></table>';
-  dw.addEventListener("change", async e=>{
-    const f = e.target.getAttribute("data-f"); if(!f) return;
-    const id = e.target.closest("tr").getAttribute("data-d");
-    const d = u.drivers.find(x=>x.id===id);
-    d[f] = ["rate","len","cx","own"].indexOf(f)>=0 ? Number(e.target.value)||0 : e.target.value;
-    await persist("unit",u);
+  /* ---------- sub-departments ---------- */
+  const sp = el("div","panel");
+  sp.appendChild(el("header",null,'<h2>'+esc((u.code?u.code+" ":"")+u.name)+' · sub-departments</h2><span class="sub">Rename, reorder by code, or remove. Removing one removes its drivers.</span>'));
+  const sw = el("div","tblwrap");
+  sw.innerHTML = '<table><thead><tr><th style="width:90px">Code</th><th>Sub-department</th><th class="r">Drivers</th><th class="r">Required FTE</th><th></th></tr></thead><tbody>'+
+    (u.subunits||[]).map(s=>{
+      const ds = (u.drivers||[]).filter(x=>x.subId===s.id);
+      return '<tr data-s="'+esc(s.id)+'">'+
+        '<td><input class="cellinput num" style="width:74px;text-align:left" type="text" data-sf="code" value="'+esc(s.code||"")+'"></td>'+
+        '<td><input class="cellinput" style="width:100%;max-width:300px;text-align:left" type="text" data-sf="name" value="'+esc(s.name)+'"></td>'+
+        '<td class="r num muted">'+ds.length+'</td>'+
+        '<td class="r num" data-sfte="'+esc(s.id)+'">'+n1(ds.reduce((a,x)=>a+driverFTE(x,unitData(u.id).counts[x.id],eng,lv),0))+'</td>'+
+        '<td class="r"><button class="btn sm danger" data-srm="'+esc(s.id)+'">Remove</button></td></tr>';
+    }).join("")+'</tbody></table>';
+  sp.appendChild(sw);
+  const saf = el("div","addrow");
+  saf.innerHTML = '<span class="addlbl">Add sub-department</span>'+
+    '<input type="text" id="ns_code" placeholder="Code" style="width:88px">'+
+    '<input type="text" id="ns_name" placeholder="Sub-department name" style="flex:1;min-width:160px">';
+  saf.appendChild(button("Add","", async ()=>{
+    const name = $("#ns_name").value.trim();
+    if(!name){ toast("Give the sub-department a name"); return; }
+    u.subunits = u.subunits||[];
+    u.subunits.push({id:uid(), code:$("#ns_code").value.trim(), name:name, order:u.subunits.length});
+    await persist("unit", u); render();
+  }));
+  sp.appendChild(saf);
+  root.appendChild(sp);
+
+  sw.addEventListener("input", e=>{
+    const f = e.target.getAttribute("data-sf"); if(!f) return;
+    const s = u.subunits.find(x=>x.id===e.target.closest("tr").getAttribute("data-s"));
+    s[f] = e.target.value; queueUnitSave(u);
   });
-  dw.addEventListener("click", async e=>{
-    const rm = e.target.getAttribute("data-rm"); if(!rm) return;
-    u.drivers = u.drivers.filter(x=>x.id!==rm); await persist("unit",u); render();
+  sw.addEventListener("click", async e=>{
+    const rm = e.target.getAttribute("data-srm"); if(!rm) return;
+    const s = u.subunits.find(x=>x.id===rm);
+    const n = (u.drivers||[]).filter(x=>x.subId===rm).length;
+    if(!confirm("Remove "+s.name+(n?" and its "+n+" drivers?":"?"))) return;
+    u.subunits = u.subunits.filter(x=>x.id!==rm);
+    u.drivers = (u.drivers||[]).filter(x=>x.subId!==rm);
+    await persist("unit", u); render();
   });
-  dp.appendChild(dw);
-  if(!(u.drivers||[]).length) dp.appendChild(el("div","empty",'<h3>No drivers yet</h3><p>Add them here, or import the whole library from your workbook.</p>'));
-  root.appendChild(dp);
+
+  /* ---------- drivers, with live FTE ---------- */
+  const f = el("div","formula");
+  f.innerHTML = 'Required FTE = <b>Count</b> × Frequency × Duration × Service hours × Complexity weight × Ownership % ÷ '+n0(eng.annualHours)+' annual hours';
+  root.appendChild(f);
+
+  const p = el("div","panel");
+  p.appendChild(el("header",null,'<h2>Demand drivers</h2><span class="sub">Every column is editable and the FTE updates as you type. Counts save to the '+esc((scenario()||{}).name||"current")+' scenario.</span>'));
+  const w = el("div","tblwrap"); w.style.maxHeight="60vh"; w.style.overflowY="auto";
+  const cts = unitData(u.id).counts;
+  const freqOpts = sel => FREQ_KEYS.map(x=>'<option'+(x===sel?" selected":"")+'>'+esc(x)+'</option>').join("");
+  let html = '<table><thead><tr><th>Capability</th><th>Demand driver</th><th>Unit counted</th>'+
+    '<th class="r">Service hrs</th><th>Frequency</th><th class="r">Dur.</th><th class="r">Cx</th><th class="r">Own %</th>'+
+    '<th class="r">Count</th><th class="r">Required FTE</th><th></th></tr></thead><tbody>';
+  (u.subunits||[]).forEach(s=>{
+    const ds = (u.drivers||[]).filter(x=>x.subId===s.id);
+    const sf = ds.reduce((a,x)=>a+driverFTE(x,cts[x.id],eng,lv),0);
+    html += '<tr class="grp"><td colspan="9">'+esc((s.code?s.code+" · ":"")+s.name)+'</td>'+
+            '<td class="r num" data-gsub="'+esc(s.id)+'">'+n1(sf)+'</td><td></td></tr>';
+    ds.forEach(d=>{
+      html += '<tr data-d="'+esc(d.id)+'">'+
+        '<td><input type="text" data-f="capability" value="'+esc(d.capability)+'" style="width:92px"></td>'+
+        '<td><input type="text" data-f="driver" value="'+esc(d.driver)+'" style="width:220px"></td>'+
+        '<td><input type="text" data-f="metric" value="'+esc(d.metric)+'" style="width:160px"></td>'+
+        '<td class="r"><input class="cellinput num" style="width:68px" type="number" step="0.01" min="0" data-f="rate" value="'+esc(d.rate)+'"></td>'+
+        '<td><select data-f="freq">'+freqOpts(d.freq)+'</select></td>'+
+        '<td class="r"><input class="cellinput num" style="width:54px" type="number" step="0.5" min="0" data-f="len" value="'+esc(d.len||1)+'"></td>'+
+        '<td class="r"><input class="cellinput num" style="width:46px" type="number" min="1" max="5" data-f="cx" value="'+esc(d.cx)+'"></td>'+
+        '<td class="r"><input class="cellinput num" style="width:56px" type="number" min="0" max="100" data-f="own" value="'+esc(d.own)+'"></td>'+
+        '<td class="r"><input class="cellinput num count" style="width:76px" type="number" min="0" data-count="'+esc(d.id)+'" value="'+(cts[d.id]!=null?esc(cts[d.id]):"")+'" placeholder="0"></td>'+
+        '<td class="r num" data-gfte="'+esc(d.id)+'">'+n1(driverFTE(d,cts[d.id],eng,lv))+'</td>'+
+        '<td class="r"><button class="btn sm ghost" data-rm="'+esc(d.id)+'" title="Remove driver">✕</button></td></tr>';
+    });
+    html += '<tr class="addline"><td colspan="11"><button class="btn sm" data-add="'+esc(s.id)+'">+ Add driver to '+esc(s.name)+'</button></td></tr>';
+  });
+  html += '</tbody><tfoot><tr><td colspan="9">'+esc(u.name)+' total</td><td class="r num" id="libtotal">'+n1(unitFTE(u,eng,lv))+'</td><td></td></tr></tfoot></table>';
+  w.innerHTML = html;
+  p.appendChild(w);
+  if(!(u.subunits||[]).length) p.appendChild(el("div","empty",'<h3>Add a sub-department first</h3><p>Drivers live inside a sub-department.</p>'));
+  root.appendChild(p);
+
+  w.addEventListener("input", e=>{
+    const cid = e.target.getAttribute("data-count");
+    if(cid){
+      const v = e.target.value==="" ? 0 : Math.max(0, Number(e.target.value)||0);
+      unitData(u.id).counts[cid] = v;
+      recalcLibrary(u, eng, lv); queueCountSave(u); return;
+    }
+    const f2 = e.target.getAttribute("data-f"); if(!f2) return;
+    const d = u.drivers.find(x=>x.id===e.target.closest("tr").getAttribute("data-d"));
+    d[f2] = ["rate","len","cx","own"].indexOf(f2)>=0 ? (Number(e.target.value)||0) : e.target.value;
+    recalcLibrary(u, eng, lv); queueUnitSave(u);
+  });
+  w.addEventListener("change", e=>{
+    if(e.target.getAttribute("data-f")==="freq"){
+      const d = u.drivers.find(x=>x.id===e.target.closest("tr").getAttribute("data-d"));
+      d.freq = e.target.value; recalcLibrary(u, eng, lv); queueUnitSave(u);
+    }
+  });
+  w.addEventListener("click", async e=>{
+    const rm = e.target.getAttribute("data-rm");
+    if(rm){
+      u.drivers = u.drivers.filter(x=>x.id!==rm);
+      delete unitData(u.id).counts[rm];
+      await persist("unit", u); render(); return;
+    }
+    const add = e.target.getAttribute("data-add");
+    if(add){
+      u.drivers = u.drivers||[];
+      u.drivers.push({id:uid(), subId:add, capability:"Operate", driver:"New demand driver",
+                      metric:"Units handled", rate:1, freq:"Monthly", len:1, cx:3, own:100});
+      await persist("unit", u); render();
+      const rows = document.querySelectorAll('[data-d]');
+      const last = rows[rows.length-1];
+      if(last){ const inp = last.querySelector('[data-f="driver"]'); if(inp){ inp.focus(); inp.select(); } }
+    }
+  });
+}
+
+function recalcLibrary(u, eng, lv){
+  const cts = unitData(u.id).counts;
+  (u.drivers||[]).forEach(d=>{
+    const c = document.querySelector('[data-gfte="'+d.id+'"]');
+    if(c) c.textContent = n1(driverFTE(d, cts[d.id], eng, lv));
+  });
+  (u.subunits||[]).forEach(s=>{
+    const v = (u.drivers||[]).filter(x=>x.subId===s.id).reduce((a,x)=>a+driverFTE(x,cts[x.id],eng,lv),0);
+    const a = document.querySelector('[data-gsub="'+s.id+'"]'); if(a) a.textContent = n1(v);
+    const b = document.querySelector('[data-sfte="'+s.id+'"]'); if(b) b.textContent = n1(v);
+  });
+  const tot = unitFTE(u, eng, lv);
+  const t = document.getElementById("libtotal"); if(t) t.textContent = n1(tot);
+  const ut = document.querySelector('[data-ufte="'+u.id+'"]'); if(ut) ut.textContent = n1(tot);
 }
 
 /* ============ import / export ============ */
