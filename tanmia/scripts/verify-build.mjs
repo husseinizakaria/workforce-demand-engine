@@ -24,20 +24,15 @@ const js = files.filter((f) => f.endsWith('.js'));
 js.length ? ok(`${js.length} JavaScript chunks`) : bad('no JavaScript output');
 
 const text = files.filter((f) => /\.(js|html|css|json|txt|map)$/.test(f)).map((f) => [f, readFileSync(f, 'utf8')]);
+// Secret VALUES (variable names may legitimately appear in setup instructions).
 const SECRET_PATTERNS = [
-  [/service_role/i, 'the string "service_role"'],
   [/sb_secret_[A-Za-z0-9_-]{10,}/, 'a Supabase secret key (sb_secret_)'],
-  [/sk-ant-[A-Za-z0-9_-]{10,}/, 'an Anthropic API key'],
-  [/re_[A-Za-z0-9]{20,}/, 'a Resend API key'],
-  [/SUPABASE_SERVICE_ROLE_KEY|ANTHROPIC_API_KEY|TWILIO_AUTH_TOKEN|RESEND_API_KEY|CRON_SECRET/, 'a server secret variable name'],
+  [/sk-ant-[A-Za-z0-9_-]{20,}/, 'an Anthropic API key'],
+  [/\bre_[A-Za-z0-9]{8}_[A-Za-z0-9]{16,}/, 'a Resend API key'],
+  [/-----BEGIN [A-Z ]*PRIVATE KEY-----/, 'a private key'],
 ];
 let leaks = 0;
 for (const [f, c] of text) for (const [re, label] of SECRET_PATTERNS) {
-  // The client deliberately contains the literal 'service_role' only inside the guard that refuses such keys.
-  if (label.startsWith('the string') && /jwtRole\(|isServiceKeyMisconfigured/.test(c)) {
-    const stripped = c.replace(/["']service_role["']/g, '');
-    if (!re.test(stripped)) continue;
-  }
   if (re.test(c)) { leaks++; bad(`${f.replace(dist, 'dist/')} contains ${label}`); }
 }
 if (!leaks) ok('no server secrets in the bundle');

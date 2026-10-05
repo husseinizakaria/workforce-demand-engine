@@ -15,7 +15,7 @@ describe('assessment scoring (parity with SQL trigger fixture)', () => {
     options: q.options, weight: q.weight, reverse_scored: q.reverse_scored }));
 
   it('scores responses exactly like the database trigger', () => {
-    const r = scoreResult(tool, dims, questions, { responses: fixture.responses as Record<string, never> });
+    const r = scoreResult(tool, dims, questions, { responses: fixture.responses as unknown as Record<string, never> });
     expect(r.dimension_scores.D1).toBe(fixture.expected.D1);
     expect(r.dimension_scores.D2).toBe(fixture.expected.D2);
     expect(r.total_score).toBe(fixture.expected.total_score);

@@ -17,6 +17,7 @@ export async function callFunction<T>(name: EdgeFunctionName, body: Record<strin
       let payload: { error?: AppError } | null = null;
       try { payload = await error.context.json(); } catch { /* not json */ }
       if (payload?.error) fail(payload.error);
+      if (error.context.status === 404) fail({ code: 'function_unavailable', message: `${name} not deployed` });
       fail({ code: String(error.context.status), message: `HTTP ${error.context.status}` });
     }
     if (error instanceof FunctionsRelayError || error instanceof FunctionsFetchError) fail({ code: 'function_unavailable', message: error.message });
