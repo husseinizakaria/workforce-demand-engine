@@ -7,9 +7,10 @@ import { useI18n } from '@/i18n/I18nProvider';
 import { useOrg } from '@/app/OrgProvider';
 import { useAsync } from '@/hooks/useAsync';
 import { useAction } from '@/hooks/useAction';
-import { all, maybe, rpc, update } from '@/services/db';
+import { all } from '@/services/db';
+import { findCentralMaturityFramework, linkMaturityFramework } from '../../setup';
 import { Badge, Button, Card, CardBody, CardHeader, DataTable, EmptyState, Notice, Select } from '@/components/ui';
-import type { AssessmentTool, MaturityFramework } from '@/types/db';
+import type { AssessmentTool } from '@/types/db';
 import { avg, errText, round1 } from '../../lib';
 import { useWorkspace } from '../context';
 import { MaturityPanel } from '../components/MaturityPanel';
@@ -51,10 +52,9 @@ export default function AssessmentsTab() {
   const fw = b.maturityFrameworks.find((f) => f.id === fwId) ?? b.maturityFrameworks[0];
 
   const link = useAction(async () => {
-    const central = await maybe<MaturityFramework>('maturity_frameworks', [['organization_id', 'is', null], ['track_code', 'eq', track], ['status', 'eq', 'active']]);
+    const central = await findCentralMaturityFramework(track);
     if (!central) throw { code: 'not_found', message: tr('لا يوجد إطار نضج مركزي لهذا المسار', 'No central maturity framework for this track') };
-    const id = await rpc<string>('copy_central_template', { p_kind: 'maturity_framework', p_id: central.id, p_org: org.id });
-    await update<MaturityFramework>('maturity_frameworks', id, { program_id: ws.programId });
+    await linkMaturityFramework(org.id, ws.programId, central.id);
     await ws.reload();
   }, { success: ['تم ربط إطار النضج بالبرنامج', 'Maturity framework linked to the program'] });
 

@@ -216,6 +216,10 @@ select tests.throws(format($q$insert into public.form_submissions (organization_
   'beneficiary cannot submit on behalf of someone else', '42501');
 select tests.throws($q$update public.form_submissions set status = 'approved'$q$, 'beneficiary cannot approve own submission', '42501');
 reset role;
+select tests.login('admin.a@tanmia.test');
+set role authenticated;
+select tests.throws(format($q$update public.form_templates set schema = '{"fields":[]}' where id = %L$q$, :'form_id'), 'published form with submissions is locked', '42501');
+reset role;
 
 -- ---------------------------------------------------------------- notifications
 insert into public.notifications (organization_id, user_id, event_type, title, status) values

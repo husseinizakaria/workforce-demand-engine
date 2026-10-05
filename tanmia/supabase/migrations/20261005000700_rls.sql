@@ -83,6 +83,35 @@ end $$;
 create trigger t30_verify_guard before insert or update on public.assessment_results
   for each row execute function public.tg_result_verification_guard();
 
+-- Verifiers without assessments.edit may only change review fields.
+create or replace function public.tg_result_verifier_scope()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is not null and not public.tenant_can(new.organization_id, 'assessments', 'edit')
+     and new.assessor_user_id is distinct from auth.uid()
+     and (new.responses is distinct from old.responses or new.dimension_scores is distinct from old.dimension_scores
+          or new.tool_id is distinct from old.tool_id or new.beneficiary_id is distinct from old.beneficiary_id
+          or new.measurement_point is distinct from old.measurement_point or new.program_id is distinct from old.program_id) then
+    raise exception 'Verifiers may only change verification fields' using errcode = '42501';
+  end if;
+  return new;
+end $$;
+create trigger t31_verifier_scope before update on public.assessment_results
+  for each row execute function public.tg_result_verifier_scope();
+
+-- Published forms that already have submissions are immutable (create a new version instead).
+create or replace function public.tg_form_template_lock()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if old.status = 'published' and (new.schema is distinct from old.schema or new.scoring_enabled is distinct from old.scoring_enabled)
+     and exists (select 1 from public.form_submissions s where s.template_id = old.id) then
+    raise exception 'Published form has submissions; create a new version' using errcode = '42501';
+  end if;
+  return new;
+end $$;
+create trigger t32_form_lock before update on public.form_templates
+  for each row execute function public.tg_form_template_lock();
+
 -- -----------------------------------------------------------------------------
 -- Enable RLS on every public table
 -- -----------------------------------------------------------------------------
@@ -169,7 +198,7 @@ create policy profiles_update on public.profiles for update to authenticated
   with check (id = auth.uid() or public.is_platform_super_admin());
 
 create policy members_select on public.organization_members for select to authenticated
-  using (user_id = auth.uid() or public.tenant_can(organization_id, 'users', 'view'));
+  using (user_id = auth.uid() or public.tenant_can(organization_id, 'users', 'view') or public.tenant_can(organization_id, 'governance', 'view'));
 create policy members_insert on public.organization_members for insert to authenticated
   with check (public.tenant_can(organization_id, 'users', 'edit'));
 create policy members_update on public.organization_members for update to authenticated
@@ -349,8 +378,10 @@ create policy results_insert on public.assessment_results for insert to authenti
   with check (public.tenant_can(organization_id, 'assessments', 'create')
               or (assessor_user_id = auth.uid() and program_id in (select public.my_expert_program_ids())));
 create policy results_update on public.assessment_results for update to authenticated
-  using (public.tenant_can(organization_id, 'assessments', 'edit') or (assessor_user_id = auth.uid() and status in ('draft','submitted')))
-  with check (public.tenant_can(organization_id, 'assessments', 'edit') or (assessor_user_id = auth.uid() and status in ('draft','submitted')));
+  using (public.tenant_can(organization_id, 'assessments', 'edit') or public.tenant_can(organization_id, 'assessments', 'verify')
+         or (assessor_user_id = auth.uid() and status in ('draft','submitted')))
+  with check (public.tenant_can(organization_id, 'assessments', 'edit') or public.tenant_can(organization_id, 'assessments', 'verify')
+         or (assessor_user_id = auth.uid() and status in ('draft','submitted')));
 create policy results_delete on public.assessment_results for delete to authenticated
   using (public.tenant_can(organization_id, 'assessments', 'delete'));
 
@@ -372,8 +403,10 @@ create policy submissions_insert on public.form_submissions for insert to authen
               or (submitted_by = auth.uid() and public.is_org_member(organization_id)
                   and (beneficiary_id is null or beneficiary_id in (select public.my_beneficiary_ids()))));
 create policy submissions_update on public.form_submissions for update to authenticated
-  using (public.tenant_can(organization_id, 'templates', 'edit') or (submitted_by = auth.uid() and status in ('draft','submitted')))
-  with check (public.tenant_can(organization_id, 'templates', 'edit') or (submitted_by = auth.uid() and status in ('draft','submitted')));
+  using (public.tenant_can(organization_id, 'templates', 'edit') or public.tenant_can(organization_id, 'templates', 'approve')
+         or (submitted_by = auth.uid() and status in ('draft','submitted')))
+  with check (public.tenant_can(organization_id, 'templates', 'edit') or public.tenant_can(organization_id, 'templates', 'approve')
+         or (submitted_by = auth.uid() and status in ('draft','submitted')));
 create policy submissions_delete on public.form_submissions for delete to authenticated
   using (public.tenant_can(organization_id, 'templates', 'delete'));
 
@@ -401,6 +434,27 @@ create policy tanmia_storage_select_own on storage.objects for select to authent
 -- -----------------------------------------------------------------------------
 create policy approvals_select on public.approval_requests for select to authenticated
   using (public.tenant_can(organization_id, 'governance', 'view') or requested_by = auth.uid() or approver_user_id = auth.uid());
+-- Requesters may cancel their own pending requests (decisions go through decide_approval).
+create or replace function public.cancel_approval(p_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  update public.approval_requests set status = 'cancelled', decided_at = now(), decided_by = auth.uid()
+   where id = p_id and status = 'pending' and (requested_by = auth.uid() or public.tenant_can(organization_id, 'governance', 'approve'));
+  if not found then raise exception 'Approval cannot be cancelled' using errcode = '42501'; end if;
+end $$;
+
+-- The governance module cannot be switched off by an organization (it hosts module settings).
+create or replace function public.tg_governance_module_lock()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.module_key = 'governance' and not new.enabled and auth.uid() is not null and not public.is_platform_super_admin() then
+    raise exception 'The governance module can only be deactivated by the platform owner' using errcode = '42501';
+  end if;
+  return new;
+end $$;
+create trigger t30_governance_lock before insert or update on public.organization_modules
+  for each row execute function public.tg_governance_module_lock();
+
 create policy approvals_insert on public.approval_requests for insert to authenticated
   with check (public.is_org_member(organization_id) and requested_by = auth.uid() and status = 'pending');
 

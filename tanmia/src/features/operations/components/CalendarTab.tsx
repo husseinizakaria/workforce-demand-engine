@@ -1,13 +1,12 @@
 // Week calendar (Sun–Sat, 07:00–22:00 Riyadh) of sessions across programs.
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
-import { riyadhParts } from '@engine';
+import { riyadhParts, riyadhToUtc } from '@engine';
 import { Button, Card, CardBody, ErrorState, Select } from '@/components/ui';
 import { useOrg } from '@/app/OrgProvider';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useAsync } from '@/hooks/useAsync';
 import { addDaysISO, startOfWeekISO, todayISO } from '@/utils/dates';
-import { riyadhToUtc } from '@engine';
 import type { Filter } from '@/services/db';
 import type { Session } from '@/types/db';
 import { isOpenStatus, loadSessionsRange, type OpsRefs } from './ops';
@@ -35,7 +34,7 @@ export function CalendarTab({ refs, onOpen, version }: { refs: OpsRefs; onOpen: 
     return loadSessionsRange(org.id, riyadhToUtc(week, '00:00'), riyadhToUtc(addDaysISO(week, 7), '00:00'), extra, 2000);
   }, [org.id, week, program, expert, type, status, version]);
 
-  const days = Array.from({ length: 7 }, (_, i) => addDaysISO(week, i));
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDaysISO(week, i)), [week]);
   const placed = useMemo<Placed[]>(() => {
     const rows = state.data ?? [];
     const active = rows.filter((s) => isOpenStatus(s.status));

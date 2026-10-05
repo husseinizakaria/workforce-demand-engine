@@ -244,11 +244,12 @@ export function QuestionsCard({ tool, dims, questions, editable, textEditable, o
     try { await remove('assessment_questions', q.id); onChanged(); } catch (e) { toast.error(errText(errorOf(e), locale)); }
   };
   const move = async (q: AssessmentQuestion, dir: -1 | 1, list: AssessmentQuestion[]) => {
-    const i = list.findIndex((x) => x.id === q.id); const other = list[i + dir];
-    if (!other) return;
+    const i = list.findIndex((x) => x.id === q.id); const j = i + dir;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    const order = [...list]; [order[i], order[j]] = [order[j], order[i]];
     try {
-      const a = q.sort_order === other.sort_order ? i + 1 : other.sort_order; const b = q.sort_order === other.sort_order ? i + 1 + dir : q.sort_order;
-      await Promise.all([update('assessment_questions', q.id, { sort_order: a }), update('assessment_questions', other.id, { sort_order: b })]);
+      // Renumber the whole group so ties (e.g. all 0) cannot leave the order ambiguous.
+      await Promise.all(order.map((x, k) => (x.sort_order !== k + 1 ? update('assessment_questions', x.id, { sort_order: k + 1 }) : null)));
       onChanged();
     } catch (e) { toast.error(errText(errorOf(e), locale)); }
   };
