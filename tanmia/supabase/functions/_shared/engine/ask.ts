@@ -9,7 +9,7 @@ import { evidenceCompleteness } from './evidence.ts';
 export type Intent = 'health' | 'next_actions' | 'risks' | 'evidence' | 'attendance' | 'maturity' | 'impact' | 'budget' | 'experts' | 'blockers' | 'summary';
 
 const PATTERNS: [Intent, RegExp][] = [
-  ['blockers', /(عائق|معوق|متوقف|توقف|block|stuck|stalled)/i],
+  ['blockers', /(عائق|عوائق|معوق|متوقف|توقف|block|stuck|stalled)/i],
   ['next_actions', /(الخطوة|التالي|ماذا (أ|ا)فعل|توصي|next|recommend|what should)/i],
   ['risks', /(خطر|مخاطر|risk|issue|قضية)/i],
   ['evidence', /(دليل|أدلة|ادلة|إثبات|evidence|proof)/i],

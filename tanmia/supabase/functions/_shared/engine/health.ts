@@ -81,7 +81,7 @@ export function programHealth(b: ProgramBundle, today: Date = new Date()): Healt
         l(`${n} مسجل مقابل طاقة ${c.capacity}.`, `${n} enrolled against capacity ${c.capacity}.`),
         l('وزّع المستفيدين على دفعات أخرى أو ارفع الطاقة.', 'Redistribute beneficiaries or increase capacity.'), { cohort_id: c.id, enrolled: n, capacity: c.capacity }, pid, 'participants', c.id));
     }
-    if (p.start_date && c.start_date && c.start_date < p.start_date || p.end_date && c.end_date && c.end_date > p.end_date) out.push(mk('COHORT_DATES', 'inconsistency', 'low', 'setup',
+    if ((p.start_date && c.start_date && c.start_date < p.start_date) || (p.end_date && c.end_date && c.end_date > p.end_date)) out.push(mk('COHORT_DATES', 'inconsistency', 'low', 'setup',
       l(`تواريخ الدفعة «${c.name}» خارج مدة البرنامج`, `Cohort “${c.name}” dates fall outside the program`),
       l('تعارض التواريخ يربك الجدولة ونقاط القياس.', 'Date conflicts confuse scheduling and measurement points.'),
       l('وحّد تواريخ الدفعة مع البرنامج.', 'Align cohort dates with the program.'), { cohort_id: c.id }, pid, 'participants', c.id));
@@ -219,7 +219,7 @@ export function programHealth(b: ProgramBundle, today: Date = new Date()): Healt
       l(`المؤشر ${i.code} خارج المسار`, `Indicator ${i.code} off track`),
       l(`«${i.name}»: آخر قيمة ${perf.latest} مقابل مستهدف ${perf.target} (تقدم ${perf.progress_pct ?? '—'}% مع مرور ${share === null ? '—' : Math.round(share * 100)}% من المدة).`,
         `“${i.name_en ?? i.name}”: latest ${perf.latest} vs target ${perf.target} (progress ${perf.progress_pct ?? '—'}% with ${share === null ? '—' : Math.round(share * 100)}% elapsed).`),
-      l('حلل أسباب الانحراف وحدّث خطة التنفيذ أو المستهدف بمبرر موثق.', 'Analyze the deviation and adjust delivery or the target with documented justification.'), { indicator_id: i.id, ...perf }, pid, 'impact', i.id));
+      l('حلل أسباب الانحراف وحدّث خطة التنفيذ أو المستهدف بمبرر موثق.', 'Analyze the deviation and adjust delivery or the target with documented justification.'), { ...perf }, pid, 'impact', i.id));
     for (const a of perf.anomalies) out.push(mk('KPI_ANOMALY', 'kpi_anomaly', 'medium', 'measurement',
       l(`قيمة غير معتادة في المؤشر ${i.code}`, `Anomaly in indicator ${i.code}`), a,
       l('تحقق من صحة البيانات ومصدرها قبل استخدامها في التقارير.', 'Verify the data and its source before reporting.'), { indicator_id: i.id }, pid, 'impact', `${i.id}:${a.en.slice(0, 24)}`));
