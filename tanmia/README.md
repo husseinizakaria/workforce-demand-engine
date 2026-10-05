@@ -125,6 +125,10 @@ npm run dev          # http://localhost:5173 against your Supabase project
 npm test             # engine + routing unit tests (Vitest)
 npm run test:db      # throwaway PostgreSQL 16: migrations + health check + RLS/RBAC/workflow suite
 npm run typecheck
+npm run test:e2e     # local Supabase-compatible stack (PostgreSQL + Supabase Auth + PostgREST + all Edge
+                     # Functions) and a Playwright browser suite: login, session restore, owner routing,
+                     # organization creation, invitation acceptance, program creation + journey, two-tenant
+                     # isolation, organization selector, no-access state, RTL/LTR, function authorization
 ```
 
 `npm run test:db` needs the PostgreSQL 16 server binaries (`apt install postgresql-16`). It emulates
