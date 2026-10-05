@@ -1,0 +1,21 @@
+{
+  "description": "Shared fixture: the SQL trigger (score_assessment_result) and the TypeScript engine (scoring.ts) must produce identical results.",
+  "tool": { "scale_min": 1, "scale_max": 5, "scoring_method": "weighted_average", "pass_threshold": 60 },
+  "dimensions": [ { "code": "D1", "weight": 1 }, { "code": "D2", "weight": 2 } ],
+  "questions": [
+    { "code": "Q1", "dimension": "D1", "question_type": "scale", "weight": 1, "reverse_scored": false, "options": [] },
+    { "code": "Q2", "dimension": "D1", "question_type": "scale", "weight": 1, "reverse_scored": true, "options": [] },
+    { "code": "Q3", "dimension": "D2", "question_type": "single_choice", "weight": 1, "reverse_scored": false,
+      "options": [ { "value": "a", "score": 2 }, { "value": "b", "score": 4 }, { "value": "c", "score": 5 } ] },
+    { "code": "Q4", "dimension": "D2", "question_type": "multiple_choice", "weight": 2, "reverse_scored": false,
+      "options": [ { "value": "x", "score": 3 }, { "value": "y", "score": 5 }, { "value": "z", "score": 1 } ] },
+    { "code": "Q5", "dimension": "D2", "question_type": "boolean", "weight": 1, "reverse_scored": false, "options": [] },
+    { "code": "Q6", "dimension": "D2", "question_type": "text", "weight": 1, "reverse_scored": false, "options": [] }
+  ],
+  "responses": { "Q1": 4, "Q2": 2, "Q3": "b", "Q4": ["x", "y"], "Q5": false, "Q6": "free text is not scored" },
+  "expected": { "D1": 4, "D2": 3.25, "total_score": 3.5, "normalized_score": 62.5, "label_en": "Proficient", "passed": true },
+  "sum_case": {
+    "dimension_scores": { "D1": 5, "D2": 3 },
+    "expected": { "total_score": 8, "normalized_score": 75 }
+  }
+}
