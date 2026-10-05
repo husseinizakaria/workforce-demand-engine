@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { EnumGroup } from '@/i18n/enums';
 import { Checkbox, EntityPicker, Field, Input, Modal, MultiCheck, Select, TagInput, Textarea, Button, Notice, type EntityKind, type Option } from '@/components/ui';
-import { useOrg } from '@/app/OrgProvider';
+import { useOrgOptional } from '@/app/OrgProvider';
 import { type AppError, errorOf } from '@/services/errors';
 import { fromLocalInput, toLocalInput } from '@/utils/dates';
 
@@ -69,7 +69,7 @@ export function RecordFields({ fields, values, onChange, errors }: {
   fields: FieldSpec[]; values: Record<string, unknown>; onChange: (name: string, v: unknown) => void; errors: Record<string, [string, string]>;
 }) {
   const { tr, enumOptions, locale } = useI18n();
-  const { org } = useOrg();
+  const orgCtx = useOrgOptional();
   return (
     <div className="form-grid">
       {fields.filter((f) => !f.visible || f.visible(values)).map((f) => {
@@ -84,7 +84,7 @@ export function RecordFields({ fields, values, onChange, errors }: {
           case 'enum-multi': control = <MultiCheck options={enumOptions(f.enumGroup!)} value={(v as string[]) ?? []} onChange={(x) => onChange(f.name, x)} />; break;
           case 'tags': control = <TagInput value={(v as string[]) ?? []} onChange={(x) => onChange(f.name, x)} placeholder={f.placeholder} />; break;
           case 'checkbox': control = <Checkbox label={locale === 'ar' ? f.label[0] : f.label[1]} checked={Boolean(v)} onChange={(x) => onChange(f.name, x)} disabled={f.disabled} />; break;
-          case 'entity': control = <EntityPicker kind={f.entity!} organizationId={org.id} value={(v as string) ?? null} filters={f.entityFilters} onChange={(x) => onChange(f.name, x)} disabled={f.disabled} />; break;
+          case 'entity': control = !orgCtx ? <Input id={id} value={String(v ?? '')} onChange={(e) => onChange(f.name, e.target.value || null)} dir="ltr" placeholder="uuid" /> : <EntityPicker kind={f.entity!} organizationId={orgCtx.org.id} value={(v as string) ?? null} filters={f.entityFilters} onChange={(x) => onChange(f.name, x)} disabled={f.disabled} />; break;
           case 'datetime': control = <Input id={id} type="datetime-local" value={typeof v === 'string' && v.includes('T') && v.length > 16 ? toLocalInput(v) : String(v ?? '')} onChange={(e) => onChange(f.name, e.target.value)} invalid={!!err} disabled={f.disabled} />; break;
           default:
             control = <Input id={id} type={f.type === 'number' ? 'number' : f.type} value={v === null || v === undefined ? '' : String(v)} min={f.min} max={f.max} step={f.step ?? (f.type === 'number' ? 'any' : undefined)}

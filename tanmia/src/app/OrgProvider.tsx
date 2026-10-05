@@ -79,3 +79,8 @@ export function useOrg(): OrgContextValue {
   if (!v) throw new Error('useOrg outside OrgProvider');
   return v;
 }
+
+/** Same as useOrg() but returns null outside an OrgProvider (e.g. /platform pages). */
+export function useOrgOptional(): OrgContextValue | null {
+  return useContext(Ctx);
+}

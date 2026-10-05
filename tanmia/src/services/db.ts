@@ -126,7 +126,7 @@ export async function removeWhere(table: string, filters: Filter[]): Promise<voi
 }
 
 export async function count(table: string, filters: Filter[] = []): Promise<number> {
-  let q = client().from(table).select('id', { count: 'exact', head: true });
+  let q = client().from(table).select('*', { count: 'exact', head: true });
   q = applyFilters(q, filters);
   const { count: c, error } = await q;
   if (error) fail(error);

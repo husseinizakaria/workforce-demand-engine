@@ -34,7 +34,8 @@ async function loadOverview(): Promise<Overview> {
   const [stats, users, superAdmins, beneficiaries, sessions7, evidencePending, centralTools, centralForms, centralMaturity, centralImpact, tracks, platformSetting, integrations, audit] = await Promise.all([
     loadOrgStats(),
     db.count('profiles'),
-    db.count('platform_users', [['is_platform_super_admin', 'eq', true], ['active', 'eq', true]]),
+    // platform_users has no `id` column, so db.count() (which selects id) cannot be used here.
+    db.all<{ user_id: string }>('platform_users', { select: 'user_id', filters: [['is_platform_super_admin', 'eq', true], ['active', 'eq', true]] }).then((r) => r.length),
     db.count('beneficiaries'),
     db.count('sessions', [['starts_at', 'gte', now.toISOString()], ['starts_at', 'lt', in7.toISOString()], ['status', 'in', ['scheduled', 'rescheduled']]]),
     db.count('evidence', [['verification_status', 'eq', 'pending']]),

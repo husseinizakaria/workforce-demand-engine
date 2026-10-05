@@ -22,7 +22,7 @@ async function loadDetail(id: string): Promise<Detail> {
     db.all<Role>('roles', { filters: [['organization_id', 'eq', id]], order: { column: 'name_ar', ascending: true } }),
     db.maybe<{ setting_value: { invitation_ttl_days?: number } }>('system_settings', [['organization_id', 'is', null], ['setting_key', 'eq', 'platform']], 'setting_value'),
     db.count('programs', [['organization_id', 'eq', id]]),
-    db.count('organization_members', [['organization_id', 'eq', id], ['active', 'eq', true]]),
+    db.all<{ user_id: string }>('organization_members', { select: 'user_id', filters: [['organization_id', 'eq', id], ['active', 'eq', true]], order: { column: 'joined_at' } }).then((r) => r.length),
   ]);
   const ttl = Number(platform?.setting_value?.invitation_ttl_days ?? 7);
   return { org, modules, roles, ttl: Number.isInteger(ttl) && ttl >= 1 && ttl <= 30 ? ttl : 7, programs, members };
