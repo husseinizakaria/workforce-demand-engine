@@ -1,9 +1,8 @@
 // Small data helpers shared by the beneficiaries / experts / vendors / partners /
 // operations features (kept inside the feature folders by convention).
-import type { HealthArea, Insight, InsightKind, Severity } from '@engine';
+import { type HealthArea, type Insight, type InsightKind, RECORD_TYPES, type Severity } from '@engine';
 import { all, type ListOptions } from '@/services/db';
 import { errorOf } from '@/services/errors';
-import { RECORD_TYPES } from '@engine';
 
 /** Tables the user cannot read (RLS / disabled modules) come back empty instead of failing the whole screen. */
 export async function safe<T>(p: Promise<T[]>): Promise<T[]> {

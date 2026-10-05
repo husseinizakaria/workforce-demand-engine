@@ -81,12 +81,12 @@ export function detectConflicts(
   return out;
 }
 
-/** ISO week start (Monday), mirroring Postgres date_trunc('week') used by check_session_conflicts. */
+/** Saudi work-week start (Sunday), mirroring check_session_conflicts. */
 export function startOfRiyadhWeek(iso: string): string {
   const d = new Date(ms(iso) + RIYADH_OFFSET_MIN * 60000);
-  const day = (d.getUTCDay() + 6) % 7; // 0 = Monday
-  const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day));
-  return monday.toISOString().slice(0, 10);
+  const day = d.getUTCDay(); // 0 = Sunday
+  const sunday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day));
+  return sunday.toISOString().slice(0, 10);
 }
 
 export interface RecurrenceInput {

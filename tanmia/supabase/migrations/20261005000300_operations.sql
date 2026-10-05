@@ -140,7 +140,7 @@ begin
       from (select coalesce(sum(extract(epoch from (s.ends_at - s.starts_at)) / 3600), 0)
                    + extract(epoch from (p_ends - p_starts)) / 3600 as h
             from public.sessions s where s.expert_id = p_expert and s.status in ('scheduled','draft') and s.id is distinct from p_exclude
-              and date_trunc('week', s.starts_at at time zone 'Asia/Riyadh') = date_trunc('week', local_start)) w
+              and date_trunc('week', (s.starts_at at time zone 'Asia/Riyadh') + interval '1 day') = date_trunc('week', local_start + interval '1 day')) w  -- Sunday-start (Saudi) week
       join public.experts e on e.id = p_expert
       where e.max_weekly_hours is not null and w.h > e.max_weekly_hours), '[]'::jsonb);
   end if;
