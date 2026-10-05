@@ -66,7 +66,7 @@ for d in "$ROOT"/supabase/functions/*/; do
   port=$((port+1)); map+="\"$name\":$port,"
   DENO_SERVE_ADDRESS="tcp:127.0.0.1:$port" SUPABASE_URL="http://127.0.0.1:$GATEWAY_PORT" SUPABASE_ANON_KEY="$ANON" \
     SUPABASE_SERVICE_ROLE_KEY="$SERVICE" APP_URL="http://127.0.0.1:$WEB_PORT" CRON_SECRET="e2e-cron-secret" \
-    setsid nohup $DENO run --allow-net --allow-env --allow-read "$d/index.ts" >"$DIR/logs/fn-$name.log" 2>&1 </dev/null & echo $! >> "$DIR/pids"
+    setsid nohup $DENO run --config "$ROOT/supabase/functions/deno.json" --allow-net --allow-env --allow-read "$d/index.ts" >"$DIR/logs/fn-$name.log" 2>&1 </dev/null & echo $! >> "$DIR/pids"
 done
 map="${map%,}}"
 AUTH_PORT=$AUTH_PORT REST_PORT=$REST_PORT GATEWAY_PORT=$GATEWAY_PORT FUNCTION_PORTS="$map" \

@@ -133,7 +133,7 @@ the Supabase `auth`/`storage` schemas and API roles, applies every migration, ru
 deactivation, self-service access, journey gates and approvals, scheduling conflicts,
 assessment-scoring parity with the TypeScript engine, maturity, evidence verification,
 organization-scoped storage, audit immutability). Edge Functions are type-checked with
-`npx deno check supabase/functions/*/index.ts`.
+`npx deno check --config supabase/functions/deno.json supabase/functions/*/index.ts`.
 
 ## Authentication routing (implemented in `src/routes/resolveHome.ts`, tested in `tests/routing.test.ts`)
 

@@ -133,7 +133,7 @@ export async function isCron(req: Request): Promise<boolean> {
   const given = req.headers.get('x-cron-secret');
   const secret = env('CRON_SECRET');
   if (!given || !secret) return false;
-  return timingSafeEqual(given, secret);
+  return await timingSafeEqual(given, secret);
 }
 
 export async function requireCron(req: Request): Promise<void> {

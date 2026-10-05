@@ -98,7 +98,7 @@ export async function sendSms(toRaw: string | null, body: string): Promise<Deliv
   if (!from || !env('TWILIO_ACCOUNT_SID') || !env('TWILIO_AUTH_TOKEN')) return { status: 'skipped', reason: 'not_configured', provider: 'twilio' };
   const to = normalizePhone(toRaw);
   if (!to) return { status: 'skipped', reason: 'no_valid_phone', provider: 'twilio' };
-  return twilioSend(to, from, body);
+  return await twilioSend(to, from, body);
 }
 
 export async function sendWhatsApp(toRaw: string | null, body: string): Promise<DeliveryResult> {
@@ -106,7 +106,7 @@ export async function sendWhatsApp(toRaw: string | null, body: string): Promise<
   if (!from || !env('TWILIO_ACCOUNT_SID') || !env('TWILIO_AUTH_TOKEN')) return { status: 'skipped', reason: 'not_configured', provider: 'twilio' };
   const to = normalizePhone(toRaw);
   if (!to) return { status: 'skipped', reason: 'no_valid_phone', provider: 'twilio' };
-  return twilioSend(`whatsapp:${to}`, from.startsWith('whatsapp:') ? from : `whatsapp:${from}`, body);
+  return await twilioSend(`whatsapp:${to}`, from.startsWith('whatsapp:') ? from : `whatsapp:${from}`, body);
 }
 
 export function textToHtml(text: string): string {

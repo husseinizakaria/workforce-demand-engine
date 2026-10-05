@@ -111,7 +111,7 @@ export async function draftNarrative(input: { task: string; facts: unknown; loca
     JSON.stringify(input.facts),
     '</facts>',
   ].join('\n');
-  return call({ system: NARRATIVE_SYSTEM, prompt, effort: input.effort ?? 'low', maxTokens: input.maxTokens ?? 4000 });
+  return await call({ system: NARRATIVE_SYSTEM, prompt, effort: input.effort ?? 'low', maxTokens: input.maxTokens ?? 4000 });
 }
 
 /** Like draftNarrative but asks for a JSON object with the given string fields. */

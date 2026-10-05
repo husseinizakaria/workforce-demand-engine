@@ -1,0 +1,72 @@
+# TANMIA — Supabase CLI configuration (Edge Functions section).
+# Every function validates the caller itself (see docs/EDGE_FUNCTIONS.md).
+# verify_jwt = false only where the gateway must let non-JWT requests through:
+#   accept-invitation     → 'preview' is token-only; 'accept' verifies the JWT in code
+#   calendar-sync         → public GET ICS feed (hashed token); POST actions verify the JWT in code
+#   dispatch-notification → cron calls authenticate with x-cron-secret; JWT callers verified in code
+#   program-health-check  → cron calls authenticate with x-cron-secret; JWT callers verified in code
+project_id = "tanmia"
+
+[functions.admin-create-user]
+enabled = true
+verify_jwt = true
+
+[functions.admin-update-user]
+enabled = true
+verify_jwt = true
+
+[functions.admin-create-organization]
+enabled = true
+verify_jwt = true
+
+[functions.send-invitation]
+enabled = true
+verify_jwt = true
+
+[functions.accept-invitation]
+enabled = true
+verify_jwt = false
+
+[functions.schedule-notification]
+enabled = true
+verify_jwt = true
+
+[functions.dispatch-notification]
+enabled = true
+verify_jwt = false
+
+[functions.generate-report]
+enabled = true
+verify_jwt = true
+
+[functions.ai-program-analysis]
+enabled = true
+verify_jwt = true
+
+[functions.ai-assessment-interpretation]
+enabled = true
+verify_jwt = true
+
+[functions.ai-impact-analysis]
+enabled = true
+verify_jwt = true
+
+[functions.expert-matching]
+enabled = true
+verify_jwt = true
+
+[functions.import-external-assessment]
+enabled = true
+verify_jwt = true
+
+[functions.evidence-verification]
+enabled = true
+verify_jwt = true
+
+[functions.calendar-sync]
+enabled = true
+verify_jwt = false
+
+[functions.program-health-check]
+enabled = true
+verify_jwt = false

@@ -1,11 +1,16 @@
 {
+  "lock": false,
   "nodeModulesDir": "none",
   "compilerOptions": {
     "strict": true,
     "noImplicitReturns": true
   },
   "lint": {
-    "rules": { "tags": ["recommended"] }
+    "rules": {
+      "tags": [
+        "recommended"
+      ]
+    }
   },
   "fmt": {
     "lineWidth": 160,
