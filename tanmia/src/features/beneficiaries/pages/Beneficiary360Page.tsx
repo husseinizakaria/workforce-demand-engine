@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router';
 import { Pencil, RefreshCw } from 'lucide-react';
-import { AsyncView, Badge, Button, Card, LinkTabs, PageHeader, StatusBadge } from '@/components/ui';
+import { AsyncView, Badge, Button, Card, LinkTabs, PageHeader, StatusBadge, useConfirm } from '@/components/ui';
 import { RecordFormModal } from '@/components/forms/RecordForm';
 import { useOrg } from '@/app/OrgProvider';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -25,6 +25,7 @@ export default function Beneficiary360Page() {
   const { tr, pick, enumLabel, fmtDate } = useI18n();
   const state = useAsync(() => loadB360(org.id, beneficiaryId), [org.id, beneficiaryId]);
   const [editOpen, setEditOpen] = useState(false);
+  const confirm = useConfirm();
   const base = `/app/beneficiaries/${beneficiaryId}`;
   const statusOptions = [{ value: 'active', label: enumLabel('entityStatus', 'active') }, { value: 'inactive', label: enumLabel('entityStatus', 'inactive') }, { value: 'archived', label: enumLabel('entityStatus', 'archived') }];
 
@@ -36,8 +37,11 @@ export default function Beneficiary360Page() {
         const save = async (v: Record<string, unknown>) => {
           const dups = await checkDuplicatesRemote(org.id, v, b.id);
           if (dups.length) {
-            throw { code: 'duplicate', message_ar: `تكرار محتمل مع: ${dups.map((x) => `${x.existing.full_name} (${x.existing.code}) — ${DUP_LABEL[x.key][0]}`).join('، ')}`,
-              message_en: `Possible duplicate of: ${dups.map((x) => `${x.existing.full_name} (${x.existing.code}) — ${DUP_LABEL[x.key][1]}`).join(', ')}` };
+            const ok = await confirm({
+              title: tr('تكرار محتمل', 'Possible duplicate'), confirmLabel: tr('حفظ على أي حال', 'Save anyway'),
+              message: <ul className="list-plain small">{dups.map((x, i) => <li key={i}>{x.existing.full_name} <span className="mono">({x.existing.code})</span> — {tr(...DUP_LABEL[x.key])}</li>)}</ul>,
+            });
+            if (!ok) throw { code: 'duplicate', message_ar: 'أُلغي الحفظ بسبب تكرار محتمل.', message_en: 'Save cancelled because of a possible duplicate.' };
           }
           const row: Record<string, unknown> = { ...v };
           if (v.consent_given && !b.consent_given) row.consent_at = new Date().toISOString();
